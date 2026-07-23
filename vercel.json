@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/transcribe.js": {
+      "maxDuration": 60
+    }
+  },
+  "crons": [{
+    "path": "/api/cleanup-stale",
+    "schedule": "0 3 * * *"
+  }]
+}

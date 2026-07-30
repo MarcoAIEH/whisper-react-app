@@ -57,13 +57,18 @@ function App() {
       }
 
       setStatus('Caricamento sicuro in corso…')
-      const blob = await upload(`audio/${crypto.randomUUID()}-${uploadFile.name}`, uploadFile, {
-        access: 'private',
-        handleUploadUrl: '/api/upload',
-        clientPayload: JSON.stringify({ accessCode }),
-        multipart: uploadFile.size > 4 * 1024 * 1024,
-        onUploadProgress: ({ percentage }) => setStatus(`Caricamento sicuro: ${Math.round(percentage)}%`),
-      })
+      let blob
+      try {
+        blob = await upload(`audio/${crypto.randomUUID()}-${uploadFile.name}`, uploadFile, {
+          access: 'private',
+          handleUploadUrl: '/api/upload',
+          clientPayload: JSON.stringify({ accessCode }),
+          multipart: uploadFile.size > 4 * 1024 * 1024,
+          onUploadProgress: ({ percentage }) => setStatus(`Caricamento sicuro: ${Math.round(percentage)}%`),
+        })
+      } catch {
+        throw new Error("Caricamento non riuscito. Verifica il codice di accesso; se è corretto, il problema è nella configurazione del server (contatta l'amministratore).")
+      }
       uploadedBlobUrl = blob.url
       setStatus('Trascrizione in corso…')
       const response = await fetch('/api/transcribe', {

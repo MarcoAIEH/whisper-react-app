@@ -10,7 +10,7 @@ Servono:
 - npm;
 - un account Vercel;
 - un progetto Vercel;
-- una API key OpenAI con credito disponibile.
+- una API key ElevenLabs con credito disponibile (piano con accesso a Scribe v2).
 
 Installa la CLI Vercel una sola volta:
 
@@ -64,19 +64,19 @@ cp .env.example .env.local
 Inserisci valori locali reali senza committare il file:
 
 ```dotenv
-OPENAI_API_KEY=<your-openai-api-key>
+ELEVENLABS_API_KEY=<your-elevenlabs-api-key>
 TRANSCRIBER_ACCESS_TOKEN=crea-un-codice-lungo-e-casuale
 BLOB_READ_WRITE_TOKEN=token-generato-da-vercel
 ```
 
-`CRON_SECRET` serve solo in produzione per il job di cleanup. Non usare mai una variabile `VITE_*` per la chiave OpenAI: le variabili con quel prefisso finiscono nel bundle browser.
+`CRON_SECRET` serve solo in produzione per il job di cleanup. Non usare mai una variabile `VITE_*` per la chiave ElevenLabs: le variabili con quel prefisso finiscono nel bundle browser.
 
 ### Produzione
 
 Imposta i segreti dalla dashboard Vercel oppure con la CLI, che chiederà il valore senza inserirlo nei file:
 
 ```bash
-vercel env add OPENAI_API_KEY production
+vercel env add ELEVENLABS_API_KEY production
 vercel env add TRANSCRIBER_ACCESS_TOKEN production
 vercel env add CRON_SECRET production
 ```
@@ -132,9 +132,9 @@ Non serve pubblicare un’app nativa negli store: la PWA usa lo stesso frontend 
 
 ## 10. Checklist sicurezza
 
-- [ ] `OPENAI_API_KEY` è presente solo in environment server-side.
+- [ ] `ELEVENLABS_API_KEY` è presente solo in environment server-side.
 - [ ] Blob store impostato su Private.
 - [ ] `TRANSCRIBER_ACCESS_TOKEN` è casuale e non è nel repository.
 - [ ] `.env.local` è ignorato da Git.
 - [ ] Il test elimina il file dal Blob dopo una trascrizione riuscita.
-- [ ] La policy cliente chiarisce invio a OpenAI e tempi di conservazione.
+- [ ] La policy cliente chiarisce invio a ElevenLabs e tempi di conservazione.

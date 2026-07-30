@@ -1,6 +1,6 @@
 # Whisper Transcriber · AIEH
 
-Una web app React installabile come PWA per trasformare audio e vocali WhatsApp in testo. Il browser carica il file in un Vercel Blob privato; una Vercel Function lo invia all’endpoint OpenAI Audio Transcriptions e restituisce il testo. Il file temporaneo viene cancellato al termine del processo.
+Una web app React installabile come PWA per trasformare audio e vocali WhatsApp in testo. Il browser carica il file in un Vercel Blob privato; una Vercel Function lo invia all’endpoint ElevenLabs Speech-to-Text (Scribe v2) e restituisce il testo. Il file temporaneo viene cancellato al termine del processo.
 
 Demo live: [whisper.aiexcellencehub.com](https://whisper.aiexcellencehub.com)
 
@@ -11,7 +11,7 @@ Questo progetto mostra un percorso completo e leggibile per costruire un prodott
 - frontend React + Vite, con installazione PWA;
 - API backend in JavaScript tramite Vercel Functions;
 - upload privato e temporaneo con Vercel Blob;
-- trascrizione con OpenAI `whisper-1`;
+- trascrizione con ElevenLabs `scribe_v2`;
 - supporto a MP3, M4A, WAV, WebM e vocali WhatsApp `.opus`;
 - protezione tramite codice d’accesso, senza chiavi nel browser;
 - cleanup automatico e sweeper giornaliero per upload abbandonati.
@@ -29,7 +29,7 @@ npm install
 npm run dev:vercel
 ```
 
-Per il primo avvio servono un progetto Vercel collegato, un Blob store privato e le variabili d’ambiente descritte nella guida. Non inserire mai una chiave OpenAI nel codice o nel repository.
+Per il primo avvio servono un progetto Vercel collegato, un Blob store privato e le variabili d’ambiente descritte nella guida. Non inserire mai una chiave ElevenLabs nel codice o nel repository.
 
 ## Comandi
 
@@ -44,10 +44,10 @@ npm run build        # build di produzione, inclusa PWA
 
 1. L’utente seleziona un file e inserisce il codice d’accesso.
 2. `/api/upload` genera un token breve per un upload privato diretto a Blob.
-3. `/api/transcribe` legge il Blob, normalizza `.opus` a Ogg, chiama OpenAI e restituisce la trascrizione.
+3. `/api/transcribe` legge il Blob, normalizza `.opus` a Ogg, chiama ElevenLabs Scribe v2 e restituisce la trascrizione.
 4. Il Blob viene cancellato prima della risposta di successo; in caso di errore intervengono cleanup client e sweeper giornaliero.
 
-Limite applicativo: 25 MB per file. Il costo OpenAI dipende dalla durata dell’audio e dal modello scelto.
+Limite applicativo: 100 MB per file. Il costo ElevenLabs dipende dai minuti di audio trascritti e viene addebitato sul credito del piano.
 
 ## Deploy su Vercel
 
@@ -55,7 +55,7 @@ Da una copia collegata al proprio progetto Vercel:
 
 ```bash
 vercel link
-vercel env add OPENAI_API_KEY production
+vercel env add ELEVENLABS_API_KEY production
 vercel env add TRANSCRIBER_ACCESS_TOKEN production
 vercel --prod
 ```

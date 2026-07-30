@@ -11,7 +11,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@breezystack/lamejs": "^1.2.7",
     "@vercel/blob": "^2.6.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"

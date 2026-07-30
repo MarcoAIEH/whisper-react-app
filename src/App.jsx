@@ -1,10 +1,8 @@
 import { useRef, useState } from 'react'
 import { upload } from '@vercel/blob/client'
-import { compressAudioToMp3 } from './compressAudio'
 import './App.css'
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024
-const OPENAI_LIMIT_BYTES = 25 * 1024 * 1024
 
 function App() {
   const inputRef = useRef(null)
@@ -42,28 +40,14 @@ function App() {
     setError('')
     setTranscript('')
     try {
-      let uploadFile = file
-      if (file.size > OPENAI_LIMIT_BYTES) {
-        setStatus('Compressione audio in corso…')
-        try {
-          const { blob: compressed } = await compressAudioToMp3(file)
-          uploadFile = new File([compressed], `${file.name.replace(/\.[^.]+$/, '')}.mp3`, { type: 'audio/mpeg' })
-        } catch {
-          throw new Error('Impossibile comprimere il file automaticamente. Prova con un formato diverso o comprimilo manualmente.')
-        }
-        if (uploadFile.size > OPENAI_LIMIT_BYTES) {
-          throw new Error('Il file è troppo lungo per rientrare nel limite di 25 MB richiesto dalla trascrizione anche dopo la compressione. Dividilo in parti più corte.')
-        }
-      }
-
       setStatus('Caricamento sicuro in corso…')
       let blob
       try {
-        blob = await upload(`audio/${crypto.randomUUID()}-${uploadFile.name}`, uploadFile, {
+        blob = await upload(`audio/${crypto.randomUUID()}-${file.name}`, file, {
           access: 'private',
           handleUploadUrl: '/api/upload',
           clientPayload: JSON.stringify({ accessCode }),
-          multipart: uploadFile.size > 4 * 1024 * 1024,
+          multipart: file.size > 4 * 1024 * 1024,
           onUploadProgress: ({ percentage }) => setStatus(`Caricamento sicuro: ${Math.round(percentage)}%`),
         })
       } catch {
@@ -120,7 +104,7 @@ function App() {
       <header>
         <span className="eyebrow">WHISPER · PRIVATO</span>
         <h1>Trascrivi in modo semplice e protetto.</h1>
-        <p>L’audio viene elaborato da OpenAI Whisper e rimosso dallo storage temporaneo appena conclusa la trascrizione.</p>
+        <p>L’audio viene elaborato da ElevenLabs Scribe e rimosso dallo storage temporaneo appena conclusa la trascrizione.</p>
       </header>
 
       <form onSubmit={transcribe}>
@@ -132,7 +116,7 @@ function App() {
           onDragOver={(event) => event.preventDefault()}
         >
           <strong>{file ? file.name : 'Scegli o trascina un audio/video'}</strong>
-          <span>{file ? `${Math.ceil(file.size / 1024 / 1024)} MB · pronto` : 'mp3, m4a, wav, opus, mp4, mov, webm · massimo 100 MB (oltre 25 MB compressi automaticamente)'}</span>
+          <span>{file ? `${Math.ceil(file.size / 1024 / 1024)} MB · pronto` : 'mp3, m4a, wav, opus, mp4, mov, webm · massimo 100 MB'}</span>
         </button>
         <input ref={inputRef} type="file" accept="audio/*,video/*,.opus,.ogg,.m4a,.wav,.mp3,.mp4,.mov,.webm" onChange={(event) => chooseFile(event.target.files[0])} />
 

@@ -4,15 +4,17 @@ header { margin-bottom: 42px; }
 h1 { color: #171725; font-size: clamp(2.3rem, 7vw, 4.5rem); line-height: .98; letter-spacing: -.06em; margin: 14px 0 16px; }
 header p { color: #646478; font-size: 1.08rem; }
 form { display: grid; gap: 18px; }
-.dropzone { min-height: 180px; padding: 28px; border: 2px dashed #bfc0df; border-radius: 20px; background: #f8f8ff; color: #282842; cursor: pointer; display: grid; place-content: center; gap: 9px; }
-.dropzone:hover { background: #f0f0ff; border-color: #5c5ee8; }
+.dropzone { min-height: 180px; padding: 28px; border: 2px dashed #bfc0df; border-radius: 20px; background: #f8f8ff; color: #282842; cursor: pointer; display: grid; place-content: center; gap: 9px; text-align: center; transition: background .18s ease, border-color .18s ease, transform .18s ease; }
+.dropzone:hover { background: #f0f0ff; border-color: #5c5ee8; transform: translateY(-2px); }
 .dropzone strong { font-size: 1.15rem; }
 .dropzone span { color: #72728b; font-size: .9rem; }
 input[type="file"] { display: none; }
 .options { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 label { color: #46465f; display: grid; gap: 7px; font-size: .84rem; font-weight: 700; }
-select, input, textarea { font: inherit; border: 1px solid #d9d9e7; border-radius: 10px; padding: 12px; background: white; }
-.submit { justify-self: start; border: 0; background: #2020ae; color: white; border-radius: 10px; padding: 13px 19px; font: inherit; font-weight: 700; cursor: pointer; }
+select, input, textarea { font: inherit; border: 1px solid #d9d9e7; border-radius: 10px; padding: 12px; background: white; transition: border-color .18s ease, box-shadow .18s ease; }
+select:focus-visible, input:focus-visible, textarea:focus-visible { outline: none; border-color: #5c5ee8; box-shadow: 0 0 0 3px rgba(92, 94, 232, .18); }
+.submit { justify-self: start; border: 0; background: #2020ae; color: white; border-radius: 10px; padding: 13px 19px; font: inherit; font-weight: 700; cursor: pointer; transition: background .18s ease, transform .18s ease; }
+.submit:hover:not(:disabled) { background: #2b2bd4; transform: translateY(-1px); }
 .submit:disabled { opacity: .6; cursor: progress; }
 .message { margin: 20px 0 0; color: #4f4f66; }
 .error { color: #a52e2e; }
@@ -21,4 +23,29 @@ select, input, textarea { font: inherit; border: 1px solid #d9d9e7; border-radiu
 h2 { color: #282842; margin: 0; }
 .result-header button { border: 1px solid #bfc0df; background: white; color: #343480; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
 textarea { box-sizing: border-box; color: #29293b; line-height: 1.6; margin-top: 14px; min-height: 300px; resize: vertical; width: 100%; }
-@media (max-width: 560px) { main { padding: 42px 0; } .options { grid-template-columns: 1fr; } }
+
+.orbit-scene { display: grid; place-items: center; margin-top: 48px; padding: 22px 0 8px; pointer-events: none; }
+.orbit { position: relative; width: 150px; height: 150px; perspective: 620px; }
+.orbit-core { position: absolute; inset: 50% auto auto 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; background: radial-gradient(circle at 32% 28%, #8f91ff, #2020ae 68%); box-shadow: 0 0 24px rgba(92, 94, 232, .42); animation: pulse 4.5s ease-in-out infinite; }
+.orbit-ring { position: absolute; inset: 0; border: 1px solid rgba(92, 94, 232, .34); border-radius: 50%; transform-style: preserve-3d; }
+.ring-a { animation: spin-a 9s linear infinite; }
+.ring-b { animation: spin-b 13s linear infinite; }
+.ring-c { animation: spin-c 17s linear infinite; }
+.orb { position: absolute; top: 50%; left: -4px; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: #5c5ee8; box-shadow: 0 0 10px rgba(92, 94, 232, .75); }
+.ring-b .orb { background: #8f91ff; }
+.ring-c .orb { background: #b9baff; }
+
+@keyframes pulse { 0%, 100% { transform: scale(1); opacity: .92; } 50% { transform: scale(1.12); opacity: 1; } }
+@keyframes spin-a { from { transform: rotateX(72deg) rotateZ(0deg); } to { transform: rotateX(72deg) rotateZ(360deg); } }
+@keyframes spin-b { from { transform: rotateX(66deg) rotateY(58deg) rotateZ(0deg); } to { transform: rotateX(66deg) rotateY(58deg) rotateZ(360deg); } }
+@keyframes spin-c { from { transform: rotateX(58deg) rotateY(-52deg) rotateZ(360deg); } to { transform: rotateX(58deg) rotateY(-52deg) rotateZ(0deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .orbit-core, .orbit-ring { animation: none; }
+  .ring-a { transform: rotateX(72deg); }
+  .ring-b { transform: rotateX(66deg) rotateY(58deg); }
+  .ring-c { transform: rotateX(58deg) rotateY(-52deg); }
+  .dropzone, .submit, select, input, textarea { transition: none; }
+}
+
+@media (max-width: 560px) { main { padding: 42px 0; } .options { grid-template-columns: 1fr; } .orbit-scene { margin-top: 48px; } }

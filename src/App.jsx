@@ -143,6 +143,15 @@ function App() {
           <textarea value={transcript} onChange={(event) => setTranscript(event.target.value)} aria-label="Trascrizione modificabile" />
         </section>
       )}
+
+      <div className="orbit-scene" aria-hidden="true">
+        <div className="orbit">
+          <span className="orbit-core" />
+          <span className="orbit-ring ring-a"><span className="orb" /></span>
+          <span className="orbit-ring ring-b"><span className="orb" /></span>
+          <span className="orbit-ring ring-c"><span className="orb" /></span>
+        </div>
+      </div>
     </main>
   )
 }

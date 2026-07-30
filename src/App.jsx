@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react'
 import { upload } from '@vercel/blob/client'
+import { compressAudioToMp3 } from './compressAudio'
 import './App.css'
 
-const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024
+const OPENAI_LIMIT_BYTES = 25 * 1024 * 1024
 
 function App() {
   const inputRef = useRef(null)
@@ -29,23 +31,37 @@ function App() {
     }
 
     if (file.size > MAX_UPLOAD_BYTES) {
-      setError('Il limite della trascrizione API è 25 MB. Comprimi o dividi il file.')
+      setError('Il file supera il limite di 100 MB.')
       return
     }
     if (!accessCode) {
       setError('Inserisci il codice di accesso.')
       return
     }
-    setStatus('Caricamento sicuro in corso…')
     setIsTranscribing(true)
     setError('')
     setTranscript('')
     try {
-      const blob = await upload(`audio/${crypto.randomUUID()}-${file.name}`, file, {
+      let uploadFile = file
+      if (file.size > OPENAI_LIMIT_BYTES) {
+        setStatus('Compressione audio in corso…')
+        try {
+          const { blob: compressed } = await compressAudioToMp3(file)
+          uploadFile = new File([compressed], `${file.name.replace(/\.[^.]+$/, '')}.mp3`, { type: 'audio/mpeg' })
+        } catch {
+          throw new Error('Impossibile comprimere il file automaticamente. Prova con un formato diverso o comprimilo manualmente.')
+        }
+        if (uploadFile.size > OPENAI_LIMIT_BYTES) {
+          throw new Error('Il file è troppo lungo per rientrare nel limite di 25 MB richiesto dalla trascrizione anche dopo la compressione. Dividilo in parti più corte.')
+        }
+      }
+
+      setStatus('Caricamento sicuro in corso…')
+      const blob = await upload(`audio/${crypto.randomUUID()}-${uploadFile.name}`, uploadFile, {
         access: 'private',
         handleUploadUrl: '/api/upload',
         clientPayload: JSON.stringify({ accessCode }),
-        multipart: file.size > 4 * 1024 * 1024,
+        multipart: uploadFile.size > 4 * 1024 * 1024,
         onUploadProgress: ({ percentage }) => setStatus(`Caricamento sicuro: ${Math.round(percentage)}%`),
       })
       uploadedBlobUrl = blob.url
@@ -111,7 +127,7 @@ function App() {
           onDragOver={(event) => event.preventDefault()}
         >
           <strong>{file ? file.name : 'Scegli o trascina un audio/video'}</strong>
-          <span>{file ? `${Math.ceil(file.size / 1024 / 1024)} MB · pronto` : 'mp3, m4a, wav, opus, mp4, mov, webm · massimo 25 MB'}</span>
+          <span>{file ? `${Math.ceil(file.size / 1024 / 1024)} MB · pronto` : 'mp3, m4a, wav, opus, mp4, mov, webm · massimo 100 MB (oltre 25 MB compressi automaticamente)'}</span>
         </button>
         <input ref={inputRef} type="file" accept="audio/*,video/*,.opus,.ogg,.m4a,.wav,.mp3,.mp4,.mov,.webm" onChange={(event) => chooseFile(event.target.files[0])} />
 

@@ -1,15 +1,10 @@
 import { del, head } from '@vercel/blob'
 
-function isAuthorized(accessCode) {
-  return Boolean(process.env.TRANSCRIBER_ACCESS_TOKEN)
-    && accessCode === process.env.TRANSCRIBER_ACCESS_TOKEN
-}
-
 export default async function handler(request, response) {
   if (request.method !== 'POST') return response.status(405).json({ detail: 'Metodo non consentito.' })
-  const { blobUrl, accessCode } = request.body || {}
-  if (!isAuthorized(accessCode) || typeof blobUrl !== 'string') {
-    return response.status(401).json({ detail: 'Non autorizzato.' })
+  const { blobUrl } = request.body || {}
+  if (typeof blobUrl !== 'string') {
+    return response.status(422).json({ detail: 'Richiesta non valida.' })
   }
 
   try {

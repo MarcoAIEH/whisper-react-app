@@ -8,7 +8,6 @@ function App() {
   const inputRef = useRef(null)
   const [file, setFile] = useState(null)
   const [language, setLanguage] = useState('it')
-  const [accessCode, setAccessCode] = useState('')
   const [status, setStatus] = useState('')
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [error, setError] = useState('')
@@ -32,10 +31,6 @@ function App() {
       setError('Il file supera il limite di 100 MB.')
       return
     }
-    if (!accessCode) {
-      setError('Inserisci il codice di accesso.')
-      return
-    }
     setIsTranscribing(true)
     setError('')
     setTranscript('')
@@ -46,19 +41,18 @@ function App() {
         blob = await upload(`audio/${crypto.randomUUID()}-${file.name}`, file, {
           access: 'private',
           handleUploadUrl: '/api/upload',
-          clientPayload: JSON.stringify({ accessCode }),
           multipart: file.size > 4 * 1024 * 1024,
           onUploadProgress: ({ percentage }) => setStatus(`Caricamento sicuro: ${Math.round(percentage)}%`),
         })
       } catch {
-        throw new Error("Caricamento non riuscito. Verifica il codice di accesso; se è corretto, il problema è nella configurazione del server (contatta l'amministratore).")
+        throw new Error("Caricamento non riuscito. Il problema è nella configurazione del server (contatta l'amministratore).")
       }
       uploadedBlobUrl = blob.url
       setStatus('Trascrizione in corso…')
       const response = await fetch('/api/transcribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ blobUrl: blob.url, language: language.trim(), accessCode }),
+        body: JSON.stringify({ blobUrl: blob.url, language: language.trim() }),
       })
       const body = await response.json()
       if (!response.ok) throw new Error(body.detail || 'Trascrizione non riuscita.')
@@ -67,7 +61,7 @@ function App() {
         await fetch('/api/cleanup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ blobUrl: uploadedBlobUrl, accessCode }),
+          body: JSON.stringify({ blobUrl: uploadedBlobUrl }),
         })
       }
       setStatus(body.cleanupCompleted
@@ -79,7 +73,7 @@ function App() {
         await fetch('/api/cleanup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ blobUrl: uploadedBlobUrl, accessCode }),
+          body: JSON.stringify({ blobUrl: uploadedBlobUrl }),
         }).catch(() => {})
       }
       setError(requestError.message)
@@ -123,9 +117,6 @@ function App() {
         <div className="options">
           <label>Lingua (codice)
             <input value={language} maxLength="3" onChange={(event) => setLanguage(event.target.value)} placeholder="it" />
-          </label>
-          <label>Codice di accesso
-            <input type="password" value={accessCode} onChange={(event) => setAccessCode(event.target.value)} placeholder="Richiesto" autoComplete="off" />
           </label>
         </div>
 

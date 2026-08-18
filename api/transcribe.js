@@ -17,11 +17,6 @@ const ISO_639_3_LANGUAGE_CODES = {
   pt: 'por',
 }
 
-function isAuthorized(accessCode) {
-  return Boolean(process.env.TRANSCRIBER_ACCESS_TOKEN)
-    && accessCode === process.env.TRANSCRIBER_ACCESS_TOKEN
-}
-
 function runFfmpeg(args) {
   return new Promise((resolve, reject) => {
     if (!ffmpegPath) return reject(new Error('FFmpeg non disponibile.'))
@@ -67,8 +62,7 @@ async function normalizeAac(audioBytes) {
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') return response.status(405).json({ detail: 'Metodo non consentito.' })
-  const { blobUrl, language = 'it', accessCode } = request.body || {}
-  if (!isAuthorized(accessCode)) return response.status(401).json({ detail: 'Non autorizzato.' })
+  const { blobUrl, language = 'it' } = request.body || {}
   if (!process.env.ELEVENLABS_API_KEY) return response.status(503).json({ detail: 'Servizio di trascrizione non configurato.' })
   if (typeof blobUrl !== 'string' || !LANGUAGE_PATTERN.test(language)) {
     return response.status(422).json({ detail: 'Richiesta non valida.' })

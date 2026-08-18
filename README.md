@@ -13,7 +13,6 @@ Questo progetto mostra un percorso completo e leggibile per costruire un prodott
 - upload privato e temporaneo con Vercel Blob;
 - trascrizione con ElevenLabs `scribe_v2`;
 - supporto a MP3, M4A, WAV, WebM, AAC e vocali WhatsApp `.opus`; AAC viene normalizzato lato server in M4A prima dell'invio a ElevenLabs;
-- protezione tramite codice d’accesso, senza chiavi nel browser;
 - cleanup automatico e sweeper giornaliero per upload abbandonati.
 
 Il progetto è volutamente piccolo: ogni componente ha una responsabilità chiara e può essere sostituito senza riscrivere l’intera app.
@@ -42,7 +41,7 @@ npm run build        # build di produzione, inclusa PWA
 
 ## Flusso tecnico
 
-1. L’utente seleziona un file e inserisce il codice d’accesso.
+1. L’utente seleziona un file.
 2. `/api/upload` genera un token breve per un upload privato diretto a Blob.
 3. `/api/transcribe` legge il Blob, normalizza `.opus` a Ogg e `.aac` a M4A in una directory temporanea della Function, chiama ElevenLabs Scribe v2 e restituisce la trascrizione.
 4. Il Blob viene cancellato prima della risposta di successo; in caso di errore intervengono cleanup client e sweeper giornaliero.
@@ -56,7 +55,6 @@ Da una copia collegata al proprio progetto Vercel:
 ```bash
 vercel link
 vercel env add ELEVENLABS_API_KEY production
-vercel env add TRANSCRIBER_ACCESS_TOKEN production
 vercel --prod
 ```
 

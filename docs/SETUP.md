@@ -67,7 +67,6 @@ Inserisci valori locali reali senza committare il file:
 
 ```dotenv
 ELEVENLABS_API_KEY=<your-elevenlabs-api-key>
-TRANSCRIBER_ACCESS_TOKEN=crea-un-codice-lungo-e-casuale
 BLOB_READ_WRITE_TOKEN=token-generato-da-vercel
 ```
 
@@ -79,11 +78,8 @@ Imposta i segreti dalla dashboard Vercel oppure con la CLI, che chiederà il val
 
 ```bash
 vercel env add ELEVENLABS_API_KEY production
-vercel env add TRANSCRIBER_ACCESS_TOKEN production
 vercel env add CRON_SECRET production
 ```
-
-Il valore di `TRANSCRIBER_ACCESS_TOKEN` è il codice che l’utente digita nella UI. Usa almeno 24 caratteri casuali. Non pubblicarlo nel README, nelle issue o nei log.
 
 ## 6. Avvia in locale
 
@@ -136,7 +132,6 @@ Non serve pubblicare un’app nativa negli store: la PWA usa lo stesso frontend 
 
 - [ ] `ELEVENLABS_API_KEY` è presente solo in environment server-side.
 - [ ] Blob store impostato su Private.
-- [ ] `TRANSCRIBER_ACCESS_TOKEN` è casuale e non è nel repository.
 - [ ] `.env.local` è ignorato da Git.
 - [ ] Il test elimina il file dal Blob dopo una trascrizione riuscita.
 - [ ] La policy cliente chiarisce invio a ElevenLabs e tempi di conservazione.

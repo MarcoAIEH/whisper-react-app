@@ -102,7 +102,7 @@ function App() {
   return (
     <main>
       <header>
-        <span className="eyebrow">WHISPER · PRIVATO</span>
+        <span className="eyebrow">SCRIBE · PRIVATO</span>
         <h1>Trascrivi in modo semplice e protetto.</h1>
         <p>L’audio viene elaborato da ElevenLabs Scribe e rimosso dallo storage temporaneo appena conclusa la trascrizione.</p>
       </header>

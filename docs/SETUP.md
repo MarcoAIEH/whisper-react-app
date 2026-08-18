@@ -29,6 +29,8 @@ npm install
 
 Il progetto è una Vite React app. Le route in `api/` sono Vercel Functions: non è necessario installare Python o avviare un server FastAPI per usare questa versione cloud.
 
+I file `.aac` sono convertiti automaticamente in M4A dal backend prima della trascrizione. La conversione usa una binary FFmpeg inclusa tra le dipendenze del progetto: l'utente non deve convertire il file manualmente.
+
 ## 3. Collega il progetto Vercel
 
 Se il progetto Vercel esiste già:

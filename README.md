@@ -1,6 +1,6 @@
 # Whisper Transcriber · AIEH
 
-Una web app React installabile come PWA per trasformare audio e vocali WhatsApp in testo. Il browser carica il file in un Vercel Blob privato; una Vercel Function lo invia all’endpoint ElevenLabs Speech-to-Text (Scribe v2) e restituisce il testo. Il file temporaneo viene cancellato al termine del processo.
+Una web app React installabile come PWA per trasformare audio e vocali WhatsApp in testo. Il browser carica il file in un Vercel Blob privato; una Vercel Function lo invia a ElevenLabs Scribe v2 e restituisce il testo. Il file temporaneo viene cancellato al termine del processo.
 
 Demo live: [whisper.aiexcellencehub.com](https://whisper.aiexcellencehub.com)
 
@@ -12,7 +12,7 @@ Questo progetto mostra un percorso completo e leggibile per costruire un prodott
 - API backend in JavaScript tramite Vercel Functions;
 - upload privato e temporaneo con Vercel Blob;
 - trascrizione con ElevenLabs `scribe_v2`;
-- supporto a MP3, M4A, WAV, WebM e vocali WhatsApp `.opus`;
+- supporto a MP3, M4A, WAV, WebM, AAC e vocali WhatsApp `.opus`; AAC viene normalizzato lato server in M4A prima dell'invio a ElevenLabs;
 - protezione tramite codice d’accesso, senza chiavi nel browser;
 - cleanup automatico e sweeper giornaliero per upload abbandonati.
 
@@ -44,10 +44,10 @@ npm run build        # build di produzione, inclusa PWA
 
 1. L’utente seleziona un file e inserisce il codice d’accesso.
 2. `/api/upload` genera un token breve per un upload privato diretto a Blob.
-3. `/api/transcribe` legge il Blob, normalizza `.opus` a Ogg, chiama ElevenLabs Scribe v2 e restituisce la trascrizione.
+3. `/api/transcribe` legge il Blob, normalizza `.opus` a Ogg e `.aac` a M4A in una directory temporanea della Function, chiama ElevenLabs Scribe v2 e restituisce la trascrizione.
 4. Il Blob viene cancellato prima della risposta di successo; in caso di errore intervengono cleanup client e sweeper giornaliero.
 
-Limite applicativo: 100 MB per file. Il costo ElevenLabs dipende dai minuti di audio trascritti e viene addebitato sul credito del piano.
+Limite applicativo: 100 MB per file. Il costo ElevenLabs dipende dalla durata dell’audio e dal piano scelto.
 
 ## Deploy su Vercel
 

@@ -1,22 +1,75 @@
 import { del, get } from '@vercel/blob'
-import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js'
+import ffmpegPath from 'ffmpeg-static'
+import { spawn } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 const MAX_AUDIO_BYTES = 100 * 1024 * 1024
 const LANGUAGE_PATTERN = /^[a-z]{2,3}$/i
+const ISO_639_3_LANGUAGE_CODES = {
+  it: 'ita',
+  en: 'eng',
+  fr: 'fra',
+  de: 'deu',
+  es: 'spa',
+  pt: 'por',
+}
 
 function isAuthorized(accessCode) {
   return Boolean(process.env.TRANSCRIBER_ACCESS_TOKEN)
     && accessCode === process.env.TRANSCRIBER_ACCESS_TOKEN
 }
 
+function runFfmpeg(args) {
+  return new Promise((resolve, reject) => {
+    if (!ffmpegPath) return reject(new Error('FFmpeg non disponibile.'))
+    const process = spawn(ffmpegPath, args)
+    let stderr = ''
+    process.stderr.on('data', (chunk) => { stderr += chunk.toString() })
+    process.once('error', reject)
+    process.once('close', (code) => {
+      if (code === 0) return resolve()
+      reject(new Error(`Conversione AAC fallita (ffmpeg ${code}): ${stderr.slice(-500)}`))
+    })
+  })
+}
+
+async function normalizeAac(audioBytes) {
+  const jobId = randomUUID()
+  const tempDirectory = join(tmpdir(), `whisper-aac-${jobId}`)
+  const inputPath = join(tempDirectory, 'input.aac')
+  const outputPath = join(tempDirectory, 'normalized.m4a')
+
+  try {
+    await mkdir(tempDirectory, { recursive: true })
+    await writeFile(inputPath, audioBytes)
+    await runFfmpeg([
+      '-hide_banner',
+      '-loglevel', 'error',
+      '-y',
+      '-i', inputPath,
+      '-vn',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      outputPath,
+    ])
+    const output = await readFile(outputPath)
+    if ((await stat(outputPath)).size > MAX_AUDIO_BYTES) {
+      throw new Error('Il file convertito supera il limite di 100 MB.')
+    }
+    return new Blob([output], { type: 'audio/mp4' })
+  } finally {
+    await rm(tempDirectory, { recursive: true, force: true })
+  }
+}
+
 export default async function handler(request, response) {
   if (request.method !== 'POST') return response.status(405).json({ detail: 'Metodo non consentito.' })
   const { blobUrl, language = 'it', accessCode } = request.body || {}
   if (!isAuthorized(accessCode)) return response.status(401).json({ detail: 'Non autorizzato.' })
-  if (!process.env.ELEVENLABS_API_KEY) {
-    console.error('Transcription: ELEVENLABS_API_KEY is not set in this environment')
-    return response.status(503).json({ detail: 'Servizio di trascrizione non configurato: manca ELEVENLABS_API_KEY.' })
-  }
+  if (!process.env.ELEVENLABS_API_KEY) return response.status(503).json({ detail: 'Servizio di trascrizione non configurato.' })
   if (typeof blobUrl !== 'string' || !LANGUAGE_PATTERN.test(language)) {
     return response.status(422).json({ detail: 'Richiesta non valida.' })
   }
@@ -31,26 +84,36 @@ export default async function handler(request, response) {
     if (!blob || !blob.blob.pathname.startsWith('audio/') || blob.blob.size > MAX_AUDIO_BYTES) {
       return response.status(422).json({ detail: 'File non valido o oltre il limite di 100 MB.' })
     }
-    const isOpus = blob.blob.pathname.toLowerCase().endsWith('.opus')
-    const audio = new Blob([await new Response(blob.stream).arrayBuffer()], {
-      type: isOpus ? 'audio/ogg' : blob.blob.contentType,
-    })
     const originalFilename = blob.blob.pathname.split('/').at(-1)
-    const audioFilename = isOpus ? originalFilename.replace(/\.opus$/i, '.ogg') : originalFilename
+    const audioBytes = await new Response(blob.stream).arrayBuffer()
+    const extension = originalFilename.split('.').at(-1)?.toLowerCase()
+    const isOpus = extension === 'opus'
+    const isAac = extension === 'aac'
+    const audio = isAac
+      ? await normalizeAac(audioBytes)
+      : new Blob([audioBytes], { type: isOpus ? 'audio/ogg' : blob.blob.contentType })
+    const body = new FormData()
+    const elevenLabsFilename = isAac
+      ? originalFilename.replace(/\.aac$/i, '.m4a')
+      : isOpus
+        ? originalFilename.replace(/\.opus$/i, '.ogg')
+        : originalFilename
+    body.append('file', audio, elevenLabsFilename)
+    body.append('model_id', 'scribe_v2')
+    const languageCode = ISO_639_3_LANGUAGE_CODES[language.toLowerCase()]
+    if (languageCode) body.append('language_code', languageCode)
 
-    const client = new ElevenLabsClient({ apiKey: process.env.ELEVENLABS_API_KEY })
-    let result
-    try {
-      result = await client.speechToText.convert({
-        modelId: 'scribe_v2',
-        file: { data: audio, filename: audioFilename, contentType: audio.type },
-        languageCode: language.toLowerCase(),
-        tagAudioEvents: false,
-      })
-    } catch (error) {
-      console.error('ElevenLabs transcription error', error?.statusCode ?? '', error?.message ?? error)
+    const elevenLabsResponse = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
+      method: 'POST',
+      headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY },
+      body,
+    })
+    if (!elevenLabsResponse.ok) {
+      const detail = (await elevenLabsResponse.text()).slice(0, 500)
+      console.error('ElevenLabs transcription error', elevenLabsResponse.status, detail)
       return response.status(502).json({ detail: 'Il servizio di trascrizione non è disponibile.' })
     }
+    const result = await elevenLabsResponse.json()
     try {
       await del(blob.blob.pathname, { token: process.env.BLOB_READ_WRITE_TOKEN })
       cleanedUp = true

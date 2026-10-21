@@ -49,3 +49,12 @@ textarea { box-sizing: border-box; color: #29293b; line-height: 1.6; margin-top:
 }
 
 @media (max-width: 560px) { main { padding: 42px 0; } .options { grid-template-columns: 1fr; } .orbit-scene { margin-top: 48px; } }
+
+.file-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 8px; }
+.file-list li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid #d9d9e7; border-radius: 10px; background: white; font-size: .9rem; }
+.file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-meta { color: #72728b; flex-shrink: 0; }
+.file-done .file-meta { color: #1f7a4d; }
+.file-error .file-meta { color: #b3261e; }
+.result-item { margin-top: 24px; }
+.result-item h3 { margin: 0; font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

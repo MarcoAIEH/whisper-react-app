@@ -39,7 +39,7 @@ async function normalizeAac(audioBytes) {
 
   try {
     await mkdir(tempDirectory, { recursive: true })
-    await writeFile(inputPath, audioBytes)
+    await writeFile(inputPath, Buffer.from(audioBytes))
     await runFfmpeg([
       '-hide_banner',
       '-loglevel', 'error',

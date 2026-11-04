@@ -70,7 +70,7 @@ ELEVENLABS_API_KEY=<your-elevenlabs-api-key>
 BLOB_READ_WRITE_TOKEN=token-generato-da-vercel
 ```
 
-`CRON_SECRET` serve solo in produzione per il job di cleanup. Non usare mai una variabile `VITE_*` per la chiave ElevenLabs: le variabili con quel prefisso finiscono nel bundle browser.
+`ANTHROPIC_API_KEY` (facoltativa, solo server-side) abilita i preset di trasformazione; senza chiave l'app funziona e i preset restano nascosti. `ANTHROPIC_MODEL` permette di cambiare modello. `CRON_SECRET` serve solo in produzione per il job di cleanup. Non usare mai una variabile `VITE_*` per la chiave ElevenLabs: le variabili con quel prefisso finiscono nel bundle browser.
 
 ### Produzione
 
@@ -79,6 +79,7 @@ Imposta i segreti dalla dashboard Vercel oppure con la CLI, che chiederà il val
 ```bash
 vercel env add ELEVENLABS_API_KEY production
 vercel env add CRON_SECRET production
+vercel env add ANTHROPIC_API_KEY production   # facoltativa: abilita i preset
 ```
 
 ## 6. Avvia in locale

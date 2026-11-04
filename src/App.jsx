@@ -1,6 +1,8 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { upload } from '@vercel/blob/client'
 import { formatTimestamp, formatTranscript, hasSpeakers, defaultSpeakerName, speakerName } from './transcript.js'
+import { FORMATS, availableFormats, exportItem } from './exporters.js'
+import { MAX_KEYTERMS, splitKeyterms } from '../api/_lib/keyterms.js'
 import './App.css'
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024
@@ -13,8 +15,8 @@ const postJson = (url, payload) => fetch(url, {
 
 const baseName = (name) => name.replace(/\.[^.]+$/, '') || 'trascrizione'
 
-const saveText = (text, filename) => {
-  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
+const saveText = (text, filename, mime = 'text/plain;charset=utf-8') => {
+  const url = URL.createObjectURL(new Blob([text], { type: mime }))
   const link = document.createElement('a')
   link.href = url
   link.download = filename
@@ -29,6 +31,15 @@ function App() {
   const [diarize, setDiarize] = useState(true)
   const [numSpeakers, setNumSpeakers] = useState('')
   const [withTimestamps, setWithTimestamps] = useState(false)
+  const [keytermsInput, setKeytermsInput] = useState('')
+  const [presets, setPresets] = useState([])
+  const [copied, setCopied] = useState('')
+
+  useEffect(() => {
+    fetch('/api/transform').then((response) => (response.ok ? response.json() : null))
+      .then((data) => setPresets(data?.presets ?? []))
+      .catch(() => setPresets([]))
+  }, [])
   const [status, setStatus] = useState('')
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [error, setError] = useState('')
@@ -46,7 +57,7 @@ function App() {
   const chooseFiles = (fileList) => {
     const files = Array.from(fileList ?? [])
     if (!files.length) return
-    setItems(files.map((file) => ({ id: crypto.randomUUID(), file, state: 'pending', transcript: '', segments: [], speakers: [], names: {}, error: '' })))
+    setItems(files.map((file) => ({ id: crypto.randomUUID(), file, state: 'pending', transcript: '', segments: [], speakers: [], names: {}, format: 'txt', presetId: '', generated: '', generating: false, genError: '', error: '' })))
     setStatus('')
     setError('')
   }
@@ -72,6 +83,8 @@ function App() {
       setStatus(`${prefix}Trascrizione in corso: ${file.name}`)
       const payload = { blobUrl: blob.url, language: language.trim(), diarize }
       if (diarize && numSpeakers.trim()) payload.numSpeakers = Number(numSpeakers)
+      const keyterms = splitKeyterms(keytermsInput)
+      if (keyterms.length) payload.keyterms = keyterms
       const response = await postJson('/api/transcribe', payload)
       const body = await response.json()
       if (!response.ok) throw new Error(body.detail || 'Trascrizione non riuscita.')
@@ -94,6 +107,10 @@ function App() {
       setError('Il numero di speaker deve essere un intero tra 1 e 32.')
       return
     }
+    if (splitKeyterms(keytermsInput).length > MAX_KEYTERMS) {
+      setError(`Puoi indicare al massimo ${MAX_KEYTERMS} termini.`)
+      return
+    }
     const oversized = items.find(({ file }) => file.size > MAX_UPLOAD_BYTES)
     if (oversized) {
       setError(`${oversized.file.name} supera il limite di 100 MB.`)
@@ -107,6 +124,33 @@ function App() {
     }
     setStatus('Elaborazione conclusa. Gli audio sono stati eliminati dallo storage temporaneo.')
     setIsTranscribing(false)
+  }
+
+  const fileFor = (item) => {
+    const format = FORMATS.find(({ id }) => id === item.format) ?? FORMATS[0]
+    return { format, content: exportItem(item, format.id, { title: baseName(item.file.name), withTimestamps }), filename: `${baseName(item.file.name)}.${format.id}` }
+  }
+
+  const copyText = async (key, text) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(key)
+      setTimeout(() => setCopied((current) => (current === key ? '' : current)), 2000)
+    } catch {
+      setError('Copia negli appunti non riuscita: copia il testo manualmente.')
+    }
+  }
+
+  const generate = async (item) => {
+    updateItem(item.id, { generating: true, genError: '' })
+    try {
+      const response = await postJson('/api/transform', { text: formatTranscript(item), presetId: item.presetId })
+      const body = await response.json()
+      if (!response.ok) throw new Error(body.detail || 'Elaborazione non riuscita.')
+      updateItem(item.id, { generated: body.result, generating: false })
+    } catch (requestError) {
+      updateItem(item.id, { generating: false, genError: requestError.message })
+    }
   }
 
   const doneItems = items.filter((item) => item.state === 'done')
@@ -157,6 +201,9 @@ function App() {
           <label>Numero di speaker (se lo sai)
             <input value={numSpeakers} inputMode="numeric" maxLength="2" disabled={!diarize} onChange={(event) => setNumSpeakers(event.target.value)} placeholder="automatico" />
           </label>
+          <label className="wide">Termini e nomi da riconoscere (separati da virgola, facoltativo)
+            <input value={keytermsInput} onChange={(event) => setKeytermsInput(event.target.value)} placeholder="AIEH, Relay.app, Marco Basile" />
+          </label>
         </div>
         <label className="check">
           <input type="checkbox" checked={diarize} onChange={(event) => setDiarize(event.target.checked)} />
@@ -190,7 +237,13 @@ function App() {
               <div key={id} className="result-item">
                 <div className="result-header">
                   <h3>{file.name}</h3>
-                  <button type="button" onClick={() => saveText(formatTranscript(item, { withTimestamps }), `${baseName(file.name)}.txt`)}>Scarica .txt</button>
+                  <div className="actions">
+                    <select aria-label={`Formato di esportazione per ${file.name}`} value={item.format} onChange={(event) => updateItem(id, { format: event.target.value })}>
+                      {availableFormats(item).map((format) => <option key={format.id} value={format.id}>{format.label}</option>)}
+                    </select>
+                    <button type="button" onClick={() => { const out = fileFor(item); saveText(out.content, out.filename, out.format.mime) }}>Scarica</button>
+                    <button type="button" onClick={() => copyText(`${id}-file`, fileFor(item).content)}>{copied === `${id}-file` ? 'Copiato ✓' : 'Copia'}</button>
+                  </div>
                 </div>
                 {hasSpeakers(item) ? (
                   <>
@@ -222,6 +275,28 @@ function App() {
                   </>
                 ) : (
                   <textarea value={transcript} onChange={(event) => updateItem(id, { transcript: event.target.value })} aria-label={`Trascrizione modificabile di ${file.name}`} />
+                )}
+                {presets.length > 0 && (
+                  <div className="transform">
+                    <div className="actions">
+                      <select aria-label={`Preset di elaborazione per ${file.name}`} value={item.presetId} onChange={(event) => updateItem(id, { presetId: event.target.value })}>
+                        <option value="">Trasforma con un preset…</option>
+                        {presets.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}
+                      </select>
+                      <button type="button" disabled={!item.presetId || item.generating} onClick={() => generate(item)}>{item.generating ? 'Elaborazione…' : 'Genera'}</button>
+                    </div>
+                    <p className="hint">Con questa funzione il testo viene inviato anche ad Anthropic.</p>
+                    {item.genError && <p className="message error" role="alert">{item.genError}</p>}
+                    {item.generated && (
+                      <>
+                        <textarea className="generated" value={item.generated} onChange={(event) => updateItem(id, { generated: event.target.value })} aria-label={`Risultato elaborato di ${file.name}`} />
+                        <div className="actions">
+                          <button type="button" onClick={() => copyText(`${id}-gen`, item.generated)}>{copied === `${id}-gen` ? 'Copiato ✓' : 'Copia'}</button>
+                          <button type="button" onClick={() => saveText(item.generated, `${baseName(file.name)}-${item.presetId}.md`, 'text/markdown;charset=utf-8')}>Scarica .md</button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
             )

@@ -73,3 +73,13 @@ textarea { box-sizing: border-box; color: #29293b; line-height: 1.6; margin-top:
 .speaker-0 { --speaker: #2020ae; } .speaker-1 { --speaker: #1f7a4d; } .speaker-2 { --speaker: #a5481a; }
 .speaker-3 { --speaker: #8a2a9e; } .speaker-4 { --speaker: #0a7088; } .speaker-5 { --speaker: #8a6d00; }
 .result > .check { margin-top: 14px; }
+
+.wide { grid-column: 1 / -1; }
+.actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.actions select { padding: 8px 10px; font-size: .88rem; }
+.actions button { border: 1px solid #bfc0df; background: white; color: #343480; padding: 8px 12px; border-radius: 8px; cursor: pointer; font: inherit; font-size: .88rem; }
+.actions button:disabled { opacity: .5; cursor: not-allowed; }
+.transform { margin-top: 18px; padding: 14px 16px; border: 1px solid #d9d9e7; border-radius: 12px; background: #fbfbff; }
+.transform .hint { margin: 8px 0 0; color: #72728b; font-size: .82rem; }
+.transform .generated { min-height: 200px; margin-bottom: 10px; }
+.result-item .result-header { flex-wrap: wrap; } .result-item h3 { max-width: 100%; }

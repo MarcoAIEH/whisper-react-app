@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { parseKeyterms } from './_lib/keyterms.js'
 import { buildSegments, listSpeakers, parseNumSpeakers } from './_lib/segments.js'
 
 const MAX_AUDIO_BYTES = 100 * 1024 * 1024
@@ -63,10 +64,11 @@ async function normalizeAac(audioBytes) {
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') return response.status(405).json({ detail: 'Metodo non consentito.' })
-  const { blobUrl, language = 'it', diarize = true, numSpeakers } = request.body || {}
+  const { blobUrl, language = 'it', diarize = true, numSpeakers, keyterms } = request.body || {}
   if (!process.env.ELEVENLABS_API_KEY) return response.status(503).json({ detail: 'Servizio di trascrizione non configurato.' })
   const speakerCount = parseNumSpeakers(numSpeakers)
-  if (typeof blobUrl !== 'string' || !LANGUAGE_PATTERN.test(language) || typeof diarize !== 'boolean' || speakerCount === undefined) {
+  const terms = parseKeyterms(keyterms)
+  if (typeof blobUrl !== 'string' || !LANGUAGE_PATTERN.test(language) || typeof diarize !== 'boolean' || speakerCount === undefined || terms === undefined) {
     return response.status(422).json({ detail: 'Richiesta non valida.' })
   }
 
@@ -101,6 +103,7 @@ export default async function handler(request, response) {
       body.append('timestamps_granularity', 'word')
       if (speakerCount !== null) body.append('num_speakers', String(speakerCount))
     }
+    if (terms) for (const term of terms) body.append('keyterms', term)
     const languageCode = ISO_639_3_LANGUAGE_CODES[language.toLowerCase()]
     if (languageCode) body.append('language_code', languageCode)
 

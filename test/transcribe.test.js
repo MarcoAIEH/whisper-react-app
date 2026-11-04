@@ -80,3 +80,18 @@ test('errore ElevenLabs → 502 e blob comunque cancellato', async () => {
   assert.equal(response.statusCode, 502)
   assert.deepEqual(deleted, ['audio/abc-call.mp3'])
 })
+
+test('keyterms validi inviati come campi ripetuti', async () => {
+  const { response, sent } = await call({ keyterms: ['AIEH', 'Relay app'] })
+  assert.equal(response.statusCode, 200)
+  assert.deepEqual(sent.form.getAll('keyterms'), ['AIEH', 'Relay app'])
+})
+
+test('keyterms assenti: nessun campo; non validi → 422 senza chiamare ElevenLabs', async () => {
+  assert.deepEqual((await call({})).sent.form.getAll('keyterms'), [])
+  for (const keyterms of ['AIEH', ['a<b'], Array.from({ length: 51 }, (_, i) => `t${i}`)]) {
+    const { response, sent } = await call({ keyterms })
+    assert.equal(response.statusCode, 422)
+    assert.equal(sent, undefined)
+  }
+})

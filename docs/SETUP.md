@@ -101,8 +101,11 @@ Apri l’URL mostrato dalla CLI. Se una chiamata `/api/*` fallisce, controlla pr
 
 ```bash
 npm run lint
+npm test
 npm run build
 ```
+
+La diarizzazione (speaker multipli) è attiva di default e usa lo stesso `ELEVENLABS_API_KEY`: nessuna configurazione aggiuntiva. Può essere disattivata dalla casella "Riconosci i diversi speaker". Dopo la trascrizione puoi rinominare gli speaker prima di scaricare il `.txt`.
 
 La build deve generare anche `dist/manifest.webmanifest` e `dist/sw.js`: sono gli asset che rendono l’app installabile dal browser.
 

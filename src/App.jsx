@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { upload } from '@vercel/blob/client'
+import { formatTimestamp, formatTranscript, hasSpeakers, defaultSpeakerName, speakerName } from './transcript.js'
 import './App.css'
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024
@@ -25,16 +26,27 @@ function App() {
   const inputRef = useRef(null)
   const [items, setItems] = useState([])
   const [language, setLanguage] = useState('it')
+  const [diarize, setDiarize] = useState(true)
+  const [numSpeakers, setNumSpeakers] = useState('')
+  const [withTimestamps, setWithTimestamps] = useState(false)
   const [status, setStatus] = useState('')
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [error, setError] = useState('')
 
   const updateItem = (id, patch) => setItems((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)))
 
+  const updateSegment = (id, index, text) => setItems((current) => current.map((item) => (
+    item.id === id ? { ...item, segments: item.segments.map((segment, position) => (position === index ? { ...segment, text } : segment)) } : item
+  )))
+
+  const renameSpeaker = (id, speakerId, name) => setItems((current) => current.map((item) => (
+    item.id === id ? { ...item, names: { ...item.names, [speakerId]: name } } : item
+  )))
+
   const chooseFiles = (fileList) => {
     const files = Array.from(fileList ?? [])
     if (!files.length) return
-    setItems(files.map((file) => ({ id: crypto.randomUUID(), file, state: 'pending', transcript: '', error: '' })))
+    setItems(files.map((file) => ({ id: crypto.randomUUID(), file, state: 'pending', transcript: '', segments: [], speakers: [], names: {}, error: '' })))
     setStatus('')
     setError('')
   }
@@ -58,12 +70,14 @@ function App() {
       uploadedBlobUrl = blob.url
       updateItem(id, { state: 'transcribing' })
       setStatus(`${prefix}Trascrizione in corso: ${file.name}`)
-      const response = await postJson('/api/transcribe', { blobUrl: blob.url, language: language.trim() })
+      const payload = { blobUrl: blob.url, language: language.trim(), diarize }
+      if (diarize && numSpeakers.trim()) payload.numSpeakers = Number(numSpeakers)
+      const response = await postJson('/api/transcribe', payload)
       const body = await response.json()
       if (!response.ok) throw new Error(body.detail || 'Trascrizione non riuscita.')
       if (!body.cleanupCompleted) await postJson('/api/cleanup', { blobUrl: uploadedBlobUrl })
       uploadedBlobUrl = null
-      updateItem(id, { state: 'done', transcript: body.transcript })
+      updateItem(id, { state: 'done', transcript: body.transcript, segments: body.segments ?? [], speakers: body.speakers ?? [], names: {} })
     } catch (requestError) {
       if (uploadedBlobUrl) await postJson('/api/cleanup', { blobUrl: uploadedBlobUrl }).catch(() => {})
       updateItem(id, { state: 'error', error: requestError.message })
@@ -74,6 +88,10 @@ function App() {
     event.preventDefault()
     if (!items.length) {
       setError('Seleziona prima uno o più file audio o video.')
+      return
+    }
+    if (diarize && numSpeakers.trim() && !(/^\d+$/.test(numSpeakers.trim()) && Number(numSpeakers) >= 1 && Number(numSpeakers) <= 32)) {
+      setError('Il numero di speaker deve essere un intero tra 1 e 32.')
       return
     }
     const oversized = items.find(({ file }) => file.size > MAX_UPLOAD_BYTES)
@@ -94,7 +112,7 @@ function App() {
   const doneItems = items.filter((item) => item.state === 'done')
 
   const downloadAll = () => saveText(
-    doneItems.map(({ file, transcript }) => `=== ${file.name} ===\n\n${transcript}`).join('\n\n\n'),
+    doneItems.map((item) => `=== ${item.file.name} ===\n\n${formatTranscript(item, { withTimestamps })}`).join('\n\n\n'),
     'trascrizioni.txt',
   )
 
@@ -136,7 +154,14 @@ function App() {
           <label>Lingua (codice)
             <input value={language} maxLength="3" onChange={(event) => setLanguage(event.target.value)} placeholder="it" />
           </label>
+          <label>Numero di speaker (se lo sai)
+            <input value={numSpeakers} inputMode="numeric" maxLength="2" disabled={!diarize} onChange={(event) => setNumSpeakers(event.target.value)} placeholder="automatico" />
+          </label>
         </div>
+        <label className="check">
+          <input type="checkbox" checked={diarize} onChange={(event) => setDiarize(event.target.checked)} />
+          Riconosci i diversi speaker
+        </label>
 
         <button className="submit" type="submit" disabled={isTranscribing}>
           {isTranscribing ? 'Elaborazione…' : items.length > 1 ? `Trascrivi ${items.length} file` : 'Trascrivi'}
@@ -152,15 +177,55 @@ function App() {
             <h2>Trascrizion{doneItems.length === 1 ? 'e' : 'i'}</h2>
             {doneItems.length > 1 && <button type="button" onClick={downloadAll}>Scarica tutto .txt</button>}
           </div>
-          {doneItems.map(({ id, file, transcript }) => (
-            <div key={id} className="result-item">
-              <div className="result-header">
-                <h3>{file.name}</h3>
-                <button type="button" onClick={() => saveText(transcript, `${baseName(file.name)}.txt`)}>Scarica .txt</button>
+          {doneItems.length > 0 && doneItems.some(hasSpeakers) && (
+            <label className="check">
+              <input type="checkbox" checked={withTimestamps} onChange={(event) => setWithTimestamps(event.target.checked)} />
+              Includi i timestamp [mm:ss] nel download
+            </label>
+          )}
+          {doneItems.map((item) => {
+            const { id, file, transcript } = item
+            const names = item.speakers.map((speakerId) => speakerName(item.names, item.speakers, speakerId))
+            return (
+              <div key={id} className="result-item">
+                <div className="result-header">
+                  <h3>{file.name}</h3>
+                  <button type="button" onClick={() => saveText(formatTranscript(item, { withTimestamps }), `${baseName(file.name)}.txt`)}>Scarica .txt</button>
+                </div>
+                {hasSpeakers(item) ? (
+                  <>
+                    <fieldset className="speakers">
+                      <legend>Nomi degli speaker</legend>
+                      {item.speakers.map((speakerId) => (
+                        <label key={speakerId}>{defaultSpeakerName(item.speakers, speakerId)}
+                          <input
+                            value={item.names[speakerId] ?? ''}
+                            maxLength="60"
+                            placeholder={defaultSpeakerName(item.speakers, speakerId)}
+                            onChange={(event) => renameSpeaker(id, speakerId, event.target.value)}
+                          />
+                        </label>
+                      ))}
+                      {new Set(names).size < names.length && <p className="hint" role="status">Due speaker hanno lo stesso nome: nel file risulteranno indistinguibili.</p>}
+                    </fieldset>
+                    <ol className="segments">
+                      {item.segments.map((segment, index) => (
+                        <li key={index} className={`speaker-${Math.max(item.speakers.indexOf(segment.speaker), 0) % 6}`}>
+                          <div className="segment-head">
+                            <strong>{speakerName(item.names, item.speakers, segment.speaker)}</strong>
+                            {segment.start !== null && <span>{formatTimestamp(segment.start)}</span>}
+                          </div>
+                          <textarea className="segment-text" value={segment.text} onChange={(event) => updateSegment(id, index, event.target.value)} aria-label={`Testo di ${speakerName(item.names, item.speakers, segment.speaker)} a ${formatTimestamp(segment.start)}`} />
+                        </li>
+                      ))}
+                    </ol>
+                  </>
+                ) : (
+                  <textarea value={transcript} onChange={(event) => updateItem(id, { transcript: event.target.value })} aria-label={`Trascrizione modificabile di ${file.name}`} />
+                )}
               </div>
-              <textarea value={transcript} onChange={(event) => updateItem(id, { transcript: event.target.value })} aria-label={`Trascrizione modificabile di ${file.name}`} />
-            </div>
-          ))}
+            )
+          })}
         </section>
       )}
 

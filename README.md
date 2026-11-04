@@ -13,7 +13,8 @@ Questo progetto mostra un percorso completo e leggibile per costruire un prodott
 - upload privato e temporaneo con Vercel Blob;
 - trascrizione con ElevenLabs `scribe_v2`;
 - supporto a MP3, M4A, WAV, WebM, AAC e vocali WhatsApp `.opus`; AAC viene normalizzato lato server in M4A prima dell'invio a ElevenLabs;
-- cleanup automatico e sweeper giornaliero per upload abbandonati.
+- cleanup automatico e sweeper giornaliero per upload abbandonati;
+- diarizzazione: riconosce i diversi speaker (`diarize=true`, opzionale `num_speakers`), permette di rinominarli nell'app e scarica il `.txt` con i nomi scelti (`Marco: testo…`), con timestamp opzionali. I nomi restano nel browser e non vengono salvati sul server.
 
 Il progetto è volutamente piccolo: ogni componente ha una responsabilità chiara e può essere sostituito senza riscrivere l’intera app.
 
@@ -36,6 +37,7 @@ Per il primo avvio servono un progetto Vercel collegato, un Blob store privato e
 npm run dev          # solo frontend Vite
 npm run dev:vercel  # frontend + Vercel Functions in locale
 npm run lint         # controllo statico
+npm run test         # test unitari e dell'handler (node:test, senza rete)
 npm run build        # build di produzione, inclusa PWA
 ```
 
@@ -43,7 +45,7 @@ npm run build        # build di produzione, inclusa PWA
 
 1. L’utente seleziona un file.
 2. `/api/upload` genera un token breve per un upload privato diretto a Blob.
-3. `/api/transcribe` legge il Blob, normalizza `.opus` a Ogg e `.aac` a M4A in una directory temporanea della Function, chiama ElevenLabs Scribe v2 e restituisce la trascrizione.
+3. `/api/transcribe` legge il Blob, normalizza `.opus` a Ogg e `.aac` a M4A in una directory temporanea della Function, chiama ElevenLabs Scribe v2 e restituisce la trascrizione con `segments[]` (speaker, tempi, testo) e `speakers[]`.
 4. Il Blob viene cancellato prima della risposta di successo; in caso di errore intervengono cleanup client e sweeper giornaliero.
 
 Limite applicativo: 100 MB per file. Il costo ElevenLabs dipende dalla durata dell’audio e dal piano scelto.

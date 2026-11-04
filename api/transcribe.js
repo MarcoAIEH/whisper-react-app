@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { buildSegments, listSpeakers, parseNumSpeakers } from './_lib/segments.js'
 
 const MAX_AUDIO_BYTES = 100 * 1024 * 1024
 const LANGUAGE_PATTERN = /^[a-z]{2,3}$/i
@@ -62,9 +63,10 @@ async function normalizeAac(audioBytes) {
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') return response.status(405).json({ detail: 'Metodo non consentito.' })
-  const { blobUrl, language = 'it' } = request.body || {}
+  const { blobUrl, language = 'it', diarize = true, numSpeakers } = request.body || {}
   if (!process.env.ELEVENLABS_API_KEY) return response.status(503).json({ detail: 'Servizio di trascrizione non configurato.' })
-  if (typeof blobUrl !== 'string' || !LANGUAGE_PATTERN.test(language)) {
+  const speakerCount = parseNumSpeakers(numSpeakers)
+  if (typeof blobUrl !== 'string' || !LANGUAGE_PATTERN.test(language) || typeof diarize !== 'boolean' || speakerCount === undefined) {
     return response.status(422).json({ detail: 'Richiesta non valida.' })
   }
 
@@ -94,6 +96,11 @@ export default async function handler(request, response) {
         : originalFilename
     body.append('file', audio, elevenLabsFilename)
     body.append('model_id', 'scribe_v2')
+    if (diarize) {
+      body.append('diarize', 'true')
+      body.append('timestamps_granularity', 'word')
+      if (speakerCount !== null) body.append('num_speakers', String(speakerCount))
+    }
     const languageCode = ISO_639_3_LANGUAGE_CODES[language.toLowerCase()]
     if (languageCode) body.append('language_code', languageCode)
 
@@ -114,10 +121,13 @@ export default async function handler(request, response) {
     } catch (error) {
       console.error('Blob cleanup error', error)
     }
+    const segments = diarize ? buildSegments(result.words) : []
     return response.status(200).json({
       transcript: result.text,
       model: 'scribe_v2',
       cleanupCompleted: cleanedUp,
+      segments,
+      speakers: listSpeakers(segments),
     })
   } catch (error) {
     console.error('Transcription error', error)

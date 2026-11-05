@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { readJson, writeJson } from './store.js'
 
 export const USERS_PATH = 'config/users.json'
-const CACHE_MS = 30_000
+const CACHE_MS = 10_000
 const FALLBACK_CACHE_MS = 5_000
 let cache = null
 
@@ -18,8 +18,9 @@ export function envUsers(raw = process.env.AUTH_USERS) {
 }
 
 // Fonte di verità: config/users.json su Blob. Finché non esiste (nessuna modifica admin) vale AUTH_USERS.
-export async function loadUsers() {
-  if (cache && cache.until > Date.now()) return cache.users
+// fresh = true salta la cache: login e operazioni admin leggono sempre lo stato aggiornato (più istanze serverless).
+export async function loadUsers({ fresh = false } = {}) {
+  if (!fresh && cache && cache.until > Date.now()) return cache.users
   let users
   let ttl = CACHE_MS
   try {

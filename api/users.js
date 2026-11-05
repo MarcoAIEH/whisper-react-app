@@ -23,7 +23,7 @@ export default async function handler(request, response) {
     if (typeof currentPassword !== 'string' || !validPassword(newPassword)) {
       return response.status(422).json({ detail: `La nuova password deve avere almeno ${MIN_PASSWORD} caratteri.` })
     }
-    const users = { ...(await loadUsers()) }
+    const users = { ...(await loadUsers({ fresh: true })) }
     const user = users[session.username]
     if (!(await verifyPassword(currentPassword, user.hash))) return response.status(403).json({ detail: 'La password attuale non è corretta.' })
     users[session.username] = { ...user, hash: await hashPassword(newPassword) }
@@ -33,7 +33,7 @@ export default async function handler(request, response) {
 
   const session = await requireAdmin(request, response)
   if (!session) return
-  const users = { ...(await loadUsers()) }
+  const users = { ...(await loadUsers({ fresh: true })) }
 
   if (method === 'GET') return response.status(200).json({ users: publicView(users) })
 

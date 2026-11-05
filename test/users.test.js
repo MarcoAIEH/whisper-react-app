@@ -109,3 +109,20 @@ test('bootstrap: senza file nello store vale AUTH_USERS, poi lo store prevale', 
   primeUsers(null)
   assert.deepEqual(Object.keys(await loadUsers()), ['solo'])
 })
+
+test('più istanze: login e admin leggono sempre lo stato fresco, non la cache', async () => {
+  fresh()
+  const { default: authHandler } = await import('../api/auth.js')
+  // un'altra istanza ha creato "nuovo" nello store mentre questa ha la cache vecchia
+  const stored = { ...structuredClone(base), nuovo: { hash: await hashPassword('Password-nuovo-1'), name: 'Nuovo', role: 'user' } }
+  memory.set(USERS_PATH, JSON.stringify({ users: stored }))
+  const login = makeResponse()
+  await authHandler({ method: 'POST', headers: {}, body: { username: 'nuovo', password: 'Password-nuovo-1' } }, login)
+  assert.equal(login.statusCode, 200)
+  // e una scrittura admin non cancella utenti creati altrove
+  memory.set(USERS_PATH, JSON.stringify({ users: { ...stored, altro: { hash: 'x', name: 'Altro', role: 'user' } } }))
+  primeUsers(structuredClone(base))
+  const response = await call({ method: 'POST', headers: admin(), body: { username: 'terzo', name: 'Terzo', password: 'Password-lunga-1' } })
+  assert.equal(response.statusCode, 201)
+  assert.ok(['nuovo', 'altro', 'terzo'].every((u) => JSON.parse(memory.get(USERS_PATH)).users[u]), 'nessun aggiornamento perso')
+})

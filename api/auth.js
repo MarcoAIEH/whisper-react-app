@@ -8,7 +8,7 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export default async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store')
-  const users = await loadUsers()
+  const users = await loadUsers({ fresh: request.method === 'POST' })
   if (!process.env.AUTH_SECRET || !users) return response.status(503).json({ detail: 'Accesso non configurato.' })
 
   if (request.method === 'GET') {

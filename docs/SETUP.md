@@ -70,7 +70,7 @@ ELEVENLABS_API_KEY=<your-elevenlabs-api-key>
 BLOB_READ_WRITE_TOKEN=token-generato-da-vercel
 ```
 
-`ANTHROPIC_API_KEY` (facoltativa, solo server-side) abilita i preset di trasformazione; senza chiave l'app funziona e i preset restano nascosti. `ANTHROPIC_MODEL` permette di cambiare modello. `CRON_SECRET` serve solo in produzione per il job di cleanup. Non usare mai una variabile `VITE_*` per la chiave ElevenLabs: le variabili con quel prefisso finiscono nel bundle browser.
+`AUTH_SECRET` e `AUTH_USERS` abilitano il login: `AUTH_USERS` è un JSON `{"utente":{"hash":"scrypt$…","name":"Nome","role":"admin"}}` (hash con `node scripts/hash-password.js`) ed è solo il seme: alla prima modifica dal pannello Utenti l'elenco passa a `config/users.json` su Blob e `AUTH_USERS` non conta più. `ANTHROPIC_API_KEY` (facoltativa, solo server-side) abilita i preset di trasformazione; senza chiave l'app funziona e i preset restano nascosti. `ANTHROPIC_MODEL` permette di cambiare modello. `CRON_SECRET` serve solo in produzione per il job di cleanup. Non usare mai una variabile `VITE_*` per la chiave ElevenLabs: le variabili con quel prefisso finiscono nel bundle browser.
 
 ### Produzione
 

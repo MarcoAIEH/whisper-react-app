@@ -112,3 +112,38 @@ button { cursor: pointer; }
   .options { grid-template-columns: 1fr; }
   .actions { width: 100%; } .actions select { flex: 1 1 100%; } .actions button { flex: 1; }
 }
+
+/* Pannelli account / utenti */
+[hidden] { display: none !important; }
+.userbar { flex-wrap: wrap; }
+.userbar .who { margin-right: auto; font-weight: 600; color: var(--text-2); }
+.panel { display: grid; gap: 16px; }
+.panel h2 { font-size: 1.5rem; }
+.panel header p { margin-top: 6px; }
+.panel-form { display: grid; gap: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow); }
+.panel-form h3 { font-size: 1.05rem; }
+.field { display: grid; gap: 6px; }
+.field-error { color: var(--danger); font-size: .84rem; font-weight: 600; }
+.field input[aria-invalid="true"] { border-color: var(--danger); }
+.password-row { display: flex; gap: 8px; align-items: stretch; }
+.password-row input { flex: 1; min-width: 0; }
+.ghost { min-height: 44px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--primary); padding: 0 12px; border-radius: 10px; font-size: .88rem; font-weight: 600; white-space: nowrap; }
+.ghost:hover { background: var(--primary-soft); }
+.user-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.user-card { display: grid; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; box-shadow: var(--shadow); }
+.user-main { display: flex; align-items: center; gap: 12px; }
+.user-main > div { display: grid; gap: 2px; min-width: 0; }
+.avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); font-weight: 800; }
+.badge { margin-left: 8px; padding: 2px 8px; border-radius: 99px; background: var(--primary-soft); color: var(--primary); font-size: .72rem; font-weight: 700; }
+.role-admin { color: var(--primary); font-weight: 700; }
+.actions button.danger { border-color: var(--danger); color: var(--danger); }
+.actions button.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.actions button.danger.solid { background: var(--danger); color: var(--surface); }
+.inline-form, .confirm { display: grid; gap: 12px; padding: 12px; border-radius: var(--radius); background: var(--surface-2); }
+.confirm { border: 1px solid var(--danger); }
+.credentials { display: grid; gap: 8px; padding: 14px 16px; border-radius: var(--radius); border: 1px solid var(--success); background: var(--surface); }
+.credentials code { font-size: 1.05rem; font-weight: 700; word-break: break-all; user-select: all; }
+.message.ok { color: var(--success); }
+.login .message { margin-bottom: 4px; }
+@media (max-width: 560px) { .user-card .actions button { flex: 1 1 46%; } .password-row { flex-wrap: wrap; } .password-row input { flex-basis: 100%; } }
+.field > label { color: var(--text-2); font-size: .84rem; font-weight: 700; }

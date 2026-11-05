@@ -3,7 +3,7 @@ import { requireAuth } from './_lib/auth.js'
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') return response.status(405).json({ detail: 'Metodo non consentito.' })
-  if (!requireAuth(request, response)) return
+  if (!(await requireAuth(request, response))) return
   const { blobUrl } = request.body || {}
   if (typeof blobUrl !== 'string') {
     return response.status(422).json({ detail: 'Richiesta non valida.' })

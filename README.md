@@ -17,6 +17,7 @@ Questo progetto mostra un percorso completo e leggibile per costruire un prodott
 - diarizzazione: riconosce i diversi speaker (`diarize=true`, opzionale `num_speakers`), permette di rinominarli nell'app e scarica il `.txt` con i nomi scelti (`Marco: testo…`), con timestamp opzionali. I nomi restano nel browser e non vengono salvati sul server;
 - export in `.txt`, `.md`, `.srt` e `.vtt` (sottotitoli con timestamp e nomi speaker) più pulsante Copia;
 - preset di trasformazione con Claude (verbale, action item, riassunto, sbobinatura pulita, post LinkedIn, FAQ): si aggiungono in una riga in `api/_lib/presets.js`. Facoltativi, attivi solo con `ANTHROPIC_API_KEY`; il testo viene inviato anche ad Anthropic;
+- accesso con login: gli utenti vivono in un file privato su Vercel Blob (`config/users.json`, solo hash scrypt). Gli amministratori aggiungono, eliminano, reimpostano password e cambiano ruoli dal pannello **Utenti**; ognuno può cambiare la propria password. Limite ai tentativi di login (5 per utente+IP, 10 per IP ogni 15 minuti). `AUTH_USERS` serve solo come seme iniziale;
 - vocabolario personalizzato (`keyterms` di ElevenLabs, max 50 termini; comporta una maggiorazione ElevenLabs del 20% sul costo di trascrizione).
 
 Il progetto è volutamente piccolo: ogni componente ha una responsabilità chiara e può essere sostituito senza riscrivere l’intera app.

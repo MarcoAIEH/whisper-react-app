@@ -65,7 +65,7 @@ async function normalizeAac(audioBytes) {
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') return response.status(405).json({ detail: 'Metodo non consentito.' })
-  if (!requireAuth(request, response)) return
+  if (!(await requireAuth(request, response))) return
   const { blobUrl, language = 'it', diarize = true, numSpeakers, keyterms } = request.body || {}
   if (!process.env.ELEVENLABS_API_KEY) return response.status(503).json({ detail: 'Servizio di trascrizione non configurato.' })
   const speakerCount = parseNumSpeakers(numSpeakers)

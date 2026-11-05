@@ -1,9 +1,13 @@
-import test, { mock } from 'node:test'
+import { memory, failures } from './blobmock.js'
+import test from 'node:test'
 import assert from 'node:assert/strict'
-import authHandler from '../api/auth.js'
-import cleanupHandler from '../api/cleanup.js'
-import { createSession, hashPassword, readCookie, verifyPassword, verifySession } from '../api/_lib/auth.js'
-import { AUTH_SECRET, authHeaders, setAuthEnv } from './helpers.js'
+
+// Import dinamici: devono avvenire dopo che il mock di @vercel/blob è registrato.
+const { default: authHandler } = await import('../api/auth.js')
+const { default: cleanupHandler } = await import('../api/cleanup.js')
+const { createSession, hashPassword, readCookie, verifyPassword, verifySession } = await import('../api/_lib/auth.js')
+const { primeUsers } = await import('../api/_lib/users.js')
+const { AUTH_SECRET, authHeaders, setAuthEnv } = await import('./helpers.js')
 
 const makeResponse = () => ({ statusCode: 0, body: null, headers: {}, setHeader(k, v) { this.headers[k] = v }, status(c) { this.statusCode = c; return this }, json(b) { this.body = b; return this } })
 const call = async (handler, request) => { const response = makeResponse(); await handler(request, response); return response }
@@ -18,17 +22,16 @@ test('hash e verifica password (scrypt)', async () => {
 })
 
 test('sessione: valida, manomessa, scaduta, segreto sbagliato', () => {
-  const user = { username: 'marco', name: 'Marco', role: 'admin' }
+  const user = { username: 'marco', name: 'Marco', role: 'admin', pv: 'abc' }
   const token = createSession(user, AUTH_SECRET, 1_000_000)
   assert.deepEqual(verifySession(token, AUTH_SECRET, 1_000_000), user)
   assert.equal(verifySession(token, 'altro-segreto', 1_000_000), null)
   assert.equal(verifySession(token + 'x', AUTH_SECRET, 1_000_000), null)
-  const [payload, signature] = token.split('.')
+  const [, signature] = token.split('.')
   const forged = Buffer.from(JSON.stringify({ u: 'marco', n: 'Marco', r: 'admin', exp: 9e12 })).toString('base64url')
   assert.equal(verifySession(`${forged}.${signature}`, AUTH_SECRET, 1_000_000), null)
   assert.equal(verifySession(token, AUTH_SECRET, 1_000_000 + 8 * 24 * 3600 * 1000), null)
   assert.equal(verifySession(undefined, AUTH_SECRET), null)
-  assert.ok(payload)
 })
 
 test('readCookie', () => {
@@ -37,12 +40,13 @@ test('readCookie', () => {
 })
 
 test('endpoint /api/auth', async (t) => {
-  setAuthEnv()
-  process.env.AUTH_USERS = JSON.stringify({
+  const users = {
     laura: { hash: await hashPassword('Pw-Laura-1'), name: 'Laura', role: 'user' },
     marco: { hash: await hashPassword('Pw-Marco-1'), name: 'Marco', role: 'admin' },
-  })
-  const login = (body) => call(authHandler, { method: 'POST', headers: {}, body })
+  }
+  setAuthEnv(users)
+  let ipCounter = 0
+  const login = (body, ip = `10.0.0.${++ipCounter}`) => call(authHandler, { method: 'POST', headers: { 'x-forwarded-for': ip }, body })
 
   await t.test('login corretto: cookie HttpOnly/Secure/SameSite e ruolo', async () => {
     const response = await login({ username: ' Laura ', password: 'Pw-Laura-1' })
@@ -59,9 +63,8 @@ test('endpoint /api/auth', async (t) => {
   })
 
   await t.test('password errata, utente inesistente, proprietà ereditate → 401 uguale', async () => {
-    const results = await Promise.all([
-      login({ username: 'laura', password: 'no' }), login({ username: 'fantasma', password: 'no' }), login({ username: '__proto__', password: 'no' }), login({ username: 'constructor', password: 'x' }),
-    ])
+    const results = []
+    for (const body of [{ username: 'laura', password: 'no' }, { username: 'fantasma', password: 'no' }, { username: '__proto__', password: 'no' }, { username: 'constructor', password: 'x' }]) results.push(await login(body))
     for (const r of results) { assert.equal(r.statusCode, 401); assert.equal(r.headers['Set-Cookie'], undefined) }
     assert.equal(new Set(results.map((r) => r.body.detail)).size, 1)
   })
@@ -77,19 +80,45 @@ test('endpoint /api/auth', async (t) => {
     assert.match((await call(authHandler, { method: 'DELETE', headers: {} })).headers['Set-Cookie'], /Max-Age=0/)
   })
 
+  await t.test('utente rimosso o password cambiata: sessione revocata', async () => {
+    const cookie = authHeaders('laura', users)
+    assert.equal((await call(authHandler, { method: 'GET', headers: cookie })).statusCode, 200)
+    primeUsers({ marco: users.marco })
+    assert.equal((await call(authHandler, { method: 'GET', headers: cookie })).statusCode, 401)
+    primeUsers({ ...users, laura: { ...users.laura, hash: await hashPassword('Nuova-Pw-123') } })
+    assert.equal((await call(authHandler, { method: 'GET', headers: cookie })).statusCode, 401)
+    primeUsers(users)
+  })
+
+  await t.test('limite tentativi: 5 errori stessa coppia utente+IP → 429, altro IP non bloccato', async () => {
+    memory.clear()
+    for (let i = 0; i < 5; i += 1) assert.equal((await login({ username: 'laura', password: 'x' }, '9.9.9.9')).statusCode, 401)
+    const locked = await login({ username: 'laura', password: 'Pw-Laura-1' }, '9.9.9.9')
+    assert.equal(locked.statusCode, 429)
+    assert.ok(Number(locked.headers['Retry-After']) > 0)
+    assert.equal(locked.headers['Set-Cookie'], undefined)
+    assert.equal((await login({ username: 'laura', password: 'Pw-Laura-1' }, '8.8.8.8')).statusCode, 200)
+    assert.equal((await login({ username: 'marco', password: 'Pw-Marco-1' }, '9.9.9.9')).statusCode, 200)
+  })
+
+  await t.test('store non raggiungibile: il login funziona comunque (fail-open sul limite)', async () => {
+    failures.read = true
+    primeUsers(users)
+    assert.equal((await login({ username: 'laura', password: 'Pw-Laura-1' })).statusCode, 200)
+    failures.read = false
+  })
+
   await t.test('non configurato → 503 (fail-closed)', async () => {
     const saved = process.env.AUTH_SECRET
     delete process.env.AUTH_SECRET
     assert.equal((await login({ username: 'laura', password: 'Pw-Laura-1' })).statusCode, 503)
-    assert.equal((await call(cleanupHandler, { method: 'POST', headers: authHeaders(), body: { blobUrl: 'x' } })).statusCode, 503)
+    assert.equal((await call(cleanupHandler, { method: 'POST', headers: authHeaders('laura', users), body: { blobUrl: 'x' } })).statusCode, 503)
     process.env.AUTH_SECRET = saved
   })
 })
 
 test('cleanup protetto: senza sessione 401', async () => {
   setAuthEnv()
-  mock.method(globalThis, 'fetch', async () => new Response('{}'))
   const response = await call(cleanupHandler, { method: 'POST', headers: {}, body: { blobUrl: 'https://x/audio/a.mp3' } })
-  mock.restoreAll()
   assert.equal(response.statusCode, 401)
 })

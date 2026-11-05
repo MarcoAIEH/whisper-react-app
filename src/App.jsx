@@ -3,6 +3,7 @@ import { upload } from '@vercel/blob/client'
 import { formatTimestamp, formatTranscript, hasSpeakers, defaultSpeakerName, speakerName } from './transcript.js'
 import { FORMATS, availableFormats, exportItem } from './exporters.js'
 import { MAX_KEYTERMS, splitKeyterms } from '../api/_lib/keyterms.js'
+import { PasswordPanel, UsersPanel } from './AccountPanels.jsx'
 import './App.css'
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024
@@ -24,7 +25,7 @@ const saveText = (text, filename, mime = 'text/plain;charset=utf-8') => {
   URL.revokeObjectURL(url)
 }
 
-function Transcriber({ user, onLogout, onSessionExpired }) {
+function Transcriber({ userBar, hidden, onSessionExpired }) {
   const inputRef = useRef(null)
   const post = (url, payload) => postJson(url, payload).then((response) => {
     if (response.status === 401) onSessionExpired()
@@ -168,11 +169,8 @@ function Transcriber({ user, onLogout, onSessionExpired }) {
   const stateLabel = { pending: 'in attesa', uploading: 'caricamento…', transcribing: 'trascrizione…', done: 'completato', error: 'errore' }
 
   return (
-    <main>
-      <div className="userbar">
-        <span>{user.name}{user.role === 'admin' ? ' · admin' : ''}</span>
-        <button type="button" onClick={onLogout}>Esci</button>
-      </div>
+    <main hidden={hidden}>
+      {userBar}
       <header>
         <span className="eyebrow">SCRIBE · PRIVATO</span>
         <h1>Trascrivi in modo semplice e protetto.</h1>
@@ -331,7 +329,7 @@ function Transcriber({ user, onLogout, onSessionExpired }) {
   )
 }
 
-function LoginForm({ onLogin }) {
+function LoginForm({ onLogin, notice }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -359,6 +357,7 @@ function LoginForm({ onLogin }) {
         <h1>Accedi.</h1>
         <p>Area riservata: inserisci le credenziali che ti sono state fornite.</p>
       </header>
+      {notice && <p className="message ok" role="status">{notice}</p>}
       <form onSubmit={submit}>
         <label>Nome utente
           <input value={username} autoComplete="username" autoCapitalize="none" autoFocus required onChange={(event) => setUsername(event.target.value)} />
@@ -373,8 +372,22 @@ function LoginForm({ onLogin }) {
   )
 }
 
+function UserBar({ user, view, onView, onLogout }) {
+  return (
+    <nav className="userbar" aria-label="Account">
+      <span className="who">{user.name}{user.role === 'admin' ? ' · admin' : ''}</span>
+      {view !== 'app' && <button type="button" onClick={() => onView('app')}>Trascrizioni</button>}
+      {user.role === 'admin' && view !== 'users' && <button type="button" onClick={() => onView('users')}>Utenti</button>}
+      {view !== 'password' && <button type="button" onClick={() => onView('password')}>Password</button>}
+      <button type="button" onClick={onLogout}>Esci</button>
+    </nav>
+  )
+}
+
 function App() {
   const [user, setUser] = useState(undefined)
+  const [view, setView] = useState('app')
+  const [notice, setNotice] = useState('')
 
   useEffect(() => {
     fetch('/api/auth').then((response) => (response.ok ? response.json() : null))
@@ -382,14 +395,28 @@ function App() {
       .catch(() => setUser(null))
   }, [])
 
-  const logout = async () => {
-    await fetch('/api/auth', { method: 'DELETE' }).catch(() => {})
+  const leave = (message = '') => {
+    setNotice(message)
+    setView('app')
     setUser(null)
   }
 
+  const logout = async () => {
+    await fetch('/api/auth', { method: 'DELETE' }).catch(() => {})
+    leave()
+  }
+
   if (user === undefined) return <main className="login"><p className="message">Caricamento…</p></main>
-  if (!user) return <LoginForm onLogin={setUser} />
-  return <Transcriber user={user} onLogout={logout} onSessionExpired={() => setUser(null)} />
+  if (!user) return <LoginForm notice={notice} onLogin={(next) => { setNotice(''); setUser(next) }} />
+
+  const bar = <UserBar user={user} view={view} onView={setView} onLogout={logout} />
+  return (
+    <>
+      <Transcriber userBar={bar} hidden={view !== 'app'} onSessionExpired={() => leave()} />
+      {view === 'users' && <main>{bar}<UsersPanel me={user} onSessionExpired={() => leave()} /></main>}
+      {view === 'password' && <main>{bar}<PasswordPanel onSessionExpired={() => leave()} onChanged={async () => { await fetch('/api/auth', { method: 'DELETE' }).catch(() => {}); leave('Password aggiornata: accedi con la nuova password.') }} /></main>}
+    </>
+  )
 }
 
 export default App

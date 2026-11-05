@@ -83,3 +83,9 @@ textarea { box-sizing: border-box; color: #29293b; line-height: 1.6; margin-top:
 .transform .hint { margin: 8px 0 0; color: #72728b; font-size: .82rem; }
 .transform .generated { min-height: 200px; margin-bottom: 10px; }
 .result-item .result-header { flex-wrap: wrap; } .result-item h3 { max-width: 100%; }
+
+.login { max-width: 440px; }
+.login header { margin-bottom: 28px; }
+.login h1 { font-size: clamp(2.2rem, 9vw, 3.2rem); }
+.userbar { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-bottom: 18px; color: #646478; font-size: .9rem; }
+.userbar button { border: 1px solid #bfc0df; background: white; color: #343480; padding: 6px 12px; border-radius: 8px; cursor: pointer; font: inherit; font-size: .85rem; }

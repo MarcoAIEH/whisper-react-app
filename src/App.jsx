@@ -24,8 +24,12 @@ const saveText = (text, filename, mime = 'text/plain;charset=utf-8') => {
   URL.revokeObjectURL(url)
 }
 
-function App() {
+function Transcriber({ user, onLogout, onSessionExpired }) {
   const inputRef = useRef(null)
+  const post = (url, payload) => postJson(url, payload).then((response) => {
+    if (response.status === 401) onSessionExpired()
+    return response
+  })
   const [items, setItems] = useState([])
   const [language, setLanguage] = useState('it')
   const [diarize, setDiarize] = useState(true)
@@ -85,14 +89,14 @@ function App() {
       if (diarize && numSpeakers.trim()) payload.numSpeakers = Number(numSpeakers)
       const keyterms = splitKeyterms(keytermsInput)
       if (keyterms.length) payload.keyterms = keyterms
-      const response = await postJson('/api/transcribe', payload)
+      const response = await post('/api/transcribe', payload)
       const body = await response.json()
       if (!response.ok) throw new Error(body.detail || 'Trascrizione non riuscita.')
-      if (!body.cleanupCompleted) await postJson('/api/cleanup', { blobUrl: uploadedBlobUrl })
+      if (!body.cleanupCompleted) await post('/api/cleanup', { blobUrl: uploadedBlobUrl })
       uploadedBlobUrl = null
       updateItem(id, { state: 'done', transcript: body.transcript, segments: body.segments ?? [], speakers: body.speakers ?? [], names: {} })
     } catch (requestError) {
-      if (uploadedBlobUrl) await postJson('/api/cleanup', { blobUrl: uploadedBlobUrl }).catch(() => {})
+      if (uploadedBlobUrl) await post('/api/cleanup', { blobUrl: uploadedBlobUrl }).catch(() => {})
       updateItem(id, { state: 'error', error: requestError.message })
     }
   }
@@ -144,7 +148,7 @@ function App() {
   const generate = async (item) => {
     updateItem(item.id, { generating: true, genError: '' })
     try {
-      const response = await postJson('/api/transform', { text: formatTranscript(item), presetId: item.presetId })
+      const response = await post('/api/transform', { text: formatTranscript(item), presetId: item.presetId })
       const body = await response.json()
       if (!response.ok) throw new Error(body.detail || 'Elaborazione non riuscita.')
       updateItem(item.id, { generated: body.result, generating: false })
@@ -164,6 +168,10 @@ function App() {
 
   return (
     <main>
+      <div className="userbar">
+        <span>{user.name}{user.role === 'admin' ? ' · admin' : ''}</span>
+        <button type="button" onClick={onLogout}>Esci</button>
+      </div>
       <header>
         <span className="eyebrow">SCRIBE · PRIVATO</span>
         <h1>Trascrivi in modo semplice e protetto.</h1>
@@ -314,6 +322,67 @@ function App() {
       </div>
     </main>
   )
+}
+
+function LoginForm({ onLogin }) {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const submit = async (event) => {
+    event.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      const response = await postJson('/api/auth', { username, password })
+      const body = await response.json()
+      if (!response.ok) throw new Error(body.detail || 'Accesso non riuscito.')
+      onLogin(body)
+    } catch (loginError) {
+      setError(loginError.message === 'Failed to fetch' ? 'Connessione non riuscita. Riprova.' : loginError.message)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <main className="login">
+      <header>
+        <span className="eyebrow">SCRIBE · PRIVATO</span>
+        <h1>Accedi.</h1>
+        <p>Area riservata: inserisci le credenziali che ti sono state fornite.</p>
+      </header>
+      <form onSubmit={submit}>
+        <label>Nome utente
+          <input value={username} autoComplete="username" autoCapitalize="none" autoFocus required onChange={(event) => setUsername(event.target.value)} />
+        </label>
+        <label>Password
+          <input type="password" value={password} autoComplete="current-password" required onChange={(event) => setPassword(event.target.value)} />
+        </label>
+        <button className="submit" type="submit" disabled={busy}>{busy ? 'Accesso…' : 'Accedi'}</button>
+        {error && <p className="message error" role="alert">{error}</p>}
+      </form>
+    </main>
+  )
+}
+
+function App() {
+  const [user, setUser] = useState(undefined)
+
+  useEffect(() => {
+    fetch('/api/auth').then((response) => (response.ok ? response.json() : null))
+      .then(setUser)
+      .catch(() => setUser(null))
+  }, [])
+
+  const logout = async () => {
+    await fetch('/api/auth', { method: 'DELETE' }).catch(() => {})
+    setUser(null)
+  }
+
+  if (user === undefined) return <main className="login"><p className="message">Caricamento…</p></main>
+  if (!user) return <LoginForm onLogin={setUser} />
+  return <Transcriber user={user} onLogout={logout} onSessionExpired={() => setUser(null)} />
 }
 
 export default App

@@ -9,6 +9,8 @@ const blobGet = mock.fn(async () => ({
 mock.module('@vercel/blob', {
   namedExports: { get: blobGet, del: async (path) => { deleted.push(path) } },
 })
+import { authHeaders, setAuthEnv } from './helpers.js'
+setAuthEnv()
 process.env.ELEVENLABS_API_KEY = 'test-key'
 process.env.BLOB_READ_WRITE_TOKEN = 'test-token'
 const { default: handler } = await import('../api/transcribe.js')
@@ -33,7 +35,7 @@ async function call(body, { ok = true } = {}) {
   deleted.length = 0
   blobGet.mock.resetCalls()
   const response = makeResponse()
-  await handler({ method: 'POST', body: { blobUrl: 'https://x/audio/abc-call.mp3', ...body } }, response)
+  await handler({ method: 'POST', headers: authHeaders(), body: { blobUrl: 'https://x/audio/abc-call.mp3', ...body } }, response)
   mock.restoreAll()
   return { response, sent }
 }
@@ -94,4 +96,14 @@ test('keyterms assenti: nessun campo; non validi → 422 senza chiamare ElevenLa
     assert.equal(response.statusCode, 422)
     assert.equal(sent, undefined)
   }
+})
+
+test('senza sessione → 401 e nessuna chiamata a ElevenLabs', async () => {
+  let called = false
+  mock.method(globalThis, 'fetch', async () => { called = true; return new Response('{}') })
+  const response = makeResponse()
+  await handler({ method: 'POST', headers: {}, body: { blobUrl: 'https://x/audio/a.mp3' } }, response)
+  mock.restoreAll()
+  assert.equal(response.statusCode, 401)
+  assert.equal(called, false)
 })

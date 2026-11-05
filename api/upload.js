@@ -1,10 +1,14 @@
 import { handleUpload } from '@vercel/blob/client'
+import { requireAuth } from './_lib/auth.js'
 
 const ALLOWED_CONTENT_TYPES = ['audio/*', 'video/mp4', 'video/quicktime', 'video/webm']
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') return response.status(405).json({ detail: 'Metodo non consentito.' })
+
+  // La callback di completamento arriva da Vercel (firmata, gestita da handleUpload) e non ha cookie.
+  if (request.body?.type !== 'blob.upload-completed' && !requireAuth(request, response)) return
 
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     console.error('Blob upload: BLOB_READ_WRITE_TOKEN is not configured')

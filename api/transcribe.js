@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { requireAuth } from './_lib/auth.js'
 import { parseKeyterms } from './_lib/keyterms.js'
 import { buildSegments, listSpeakers, parseNumSpeakers } from './_lib/segments.js'
 
@@ -64,6 +65,7 @@ async function normalizeAac(audioBytes) {
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') return response.status(405).json({ detail: 'Metodo non consentito.' })
+  if (!requireAuth(request, response)) return
   const { blobUrl, language = 'it', diarize = true, numSpeakers, keyterms } = request.body || {}
   if (!process.env.ELEVENLABS_API_KEY) return response.status(503).json({ detail: 'Servizio di trascrizione non configurato.' })
   const speakerCount = parseNumSpeakers(numSpeakers)

@@ -1,6 +1,7 @@
 import test, { mock } from 'node:test'
 import assert from 'node:assert/strict'
 import handler from '../api/transform.js'
+import { authHeaders, setAuthEnv } from './helpers.js'
 import { MAX_TEXT_CHARS } from '../api/_lib/presets.js'
 
 const makeResponse = () => ({ statusCode: 0, body: null, status(c) { this.statusCode = c; return this }, json(b) { this.body = b; return this } })
@@ -14,12 +15,13 @@ async function call(request, upstream) {
   return { response, sent }
 }
 const ok = () => new Response(JSON.stringify({ content: [{ type: 'text', text: 'Risultato' }] }))
-const post = (body) => ({ method: 'POST', body })
+setAuthEnv()
+const post = (body) => ({ method: 'POST', headers: authHeaders(), body })
 
 test('senza chiave: 503 (anche su GET)', async () => {
   delete process.env.ANTHROPIC_API_KEY
   assert.equal((await call(post({ text: 'a', presetId: 'riassunto' }), ok)).response.statusCode, 503)
-  assert.equal((await call({ method: 'GET' }, ok)).response.statusCode, 503)
+  assert.equal((await call({ method: 'GET', headers: authHeaders() }, ok)).response.statusCode, 503)
 })
 
 test('con chiave', async (t) => {
@@ -27,7 +29,7 @@ test('con chiave', async (t) => {
   t.after(() => { delete process.env.ANTHROPIC_API_KEY })
 
   await t.test('GET elenca i preset senza prompt', async () => {
-    const { response } = await call({ method: 'GET' }, ok)
+    const { response } = await call({ method: 'GET', headers: authHeaders() }, ok)
     assert.equal(response.statusCode, 200)
     assert.ok(response.body.presets.length >= 6)
     assert.ok(response.body.presets.every((p) => Object.keys(p).sort().join() === 'id,label'))
@@ -68,6 +70,14 @@ test('con chiave', async (t) => {
   })
 
   await t.test('metodo non consentito → 405', async () => {
-    assert.equal((await call({ method: 'PUT' }, ok)).response.statusCode, 405)
+    assert.equal((await call({ method: 'PUT', headers: authHeaders() }, ok)).response.statusCode, 405)
   })
+})
+
+test('senza sessione → 401 anche con chiave configurata', async () => {
+  process.env.ANTHROPIC_API_KEY = 'sk-test'
+  const { response, sent } = await call({ method: 'POST', headers: {}, body: { text: 'a', presetId: 'faq' } }, ok)
+  delete process.env.ANTHROPIC_API_KEY
+  assert.equal(response.statusCode, 401)
+  assert.equal(sent, undefined)
 })

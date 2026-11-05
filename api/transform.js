@@ -1,8 +1,10 @@
+import { requireAuth } from './_lib/auth.js'
 import { MAX_TEXT_CHARS, PRESETS, findPreset } from './_lib/presets.js'
 
 const DEFAULT_MODEL = 'claude-sonnet-5-5'
 
 export default async function handler(request, response) {
+  if (!requireAuth(request, response)) return
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) return response.status(503).json({ detail: 'Funzione non configurata.' })
 

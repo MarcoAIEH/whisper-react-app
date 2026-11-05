@@ -38,6 +38,7 @@ function Transcriber({ user, onLogout, onSessionExpired }) {
   const [keytermsInput, setKeytermsInput] = useState('')
   const [presets, setPresets] = useState([])
   const [copied, setCopied] = useState('')
+  const [dragging, setDragging] = useState(false)
 
   useEffect(() => {
     fetch('/api/transform').then((response) => (response.ok ? response.json() : null))
@@ -61,7 +62,7 @@ function Transcriber({ user, onLogout, onSessionExpired }) {
   const chooseFiles = (fileList) => {
     const files = Array.from(fileList ?? [])
     if (!files.length) return
-    setItems(files.map((file) => ({ id: crypto.randomUUID(), file, state: 'pending', transcript: '', segments: [], speakers: [], names: {}, format: 'txt', presetId: '', generated: '', generating: false, genError: '', error: '' })))
+    setItems(files.map((file) => ({ id: crypto.randomUUID(), file, state: 'pending', transcript: '', segments: [], speakers: [], names: {}, progress: 0, format: 'txt', presetId: '', generated: '', generating: false, genError: '', error: '' })))
     setStatus('')
     setError('')
   }
@@ -77,7 +78,7 @@ function Transcriber({ user, onLogout, onSessionExpired }) {
           access: 'private',
           handleUploadUrl: '/api/upload',
           multipart: file.size > 4 * 1024 * 1024,
-          onUploadProgress: ({ percentage }) => setStatus(`${prefix}Caricamento sicuro di ${file.name}: ${Math.round(percentage)}%`),
+          onUploadProgress: ({ percentage }) => { updateItem(id, { progress: Math.round(percentage) }); setStatus(`${prefix}Caricamento sicuro di ${file.name}: ${Math.round(percentage)}%`) },
         })
       } catch {
         throw new Error("Caricamento non riuscito. Il problema è nella configurazione del server (contatta l'amministratore).")
@@ -180,11 +181,12 @@ function Transcriber({ user, onLogout, onSessionExpired }) {
 
       <form onSubmit={transcribe}>
         <button
-          className="dropzone"
+          className={`dropzone${dragging ? ' dragging' : ''}`}
           type="button"
           onClick={() => inputRef.current?.click()}
-          onDrop={(event) => { event.preventDefault(); chooseFiles(event.dataTransfer.files) }}
-          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => { event.preventDefault(); setDragging(false); chooseFiles(event.dataTransfer.files) }}
+          onDragOver={(event) => { event.preventDefault(); setDragging(true) }}
+          onDragLeave={() => setDragging(false)}
         >
           <strong>{items.length ? `${items.length} file selezionat${items.length === 1 ? 'o' : 'i'}` : 'Scegli o trascina uno o più audio/video'}</strong>
           <span>{items.length ? 'Clicca o trascina per cambiare la selezione' : 'mp3, m4a, wav, opus, mp4, mov, webm · massimo 100 MB ciascuno'}</span>
@@ -193,10 +195,15 @@ function Transcriber({ user, onLogout, onSessionExpired }) {
 
         {items.length > 0 && (
           <ul className="file-list">
-            {items.map(({ id, file, state, error: itemError }) => (
+            {items.map(({ id, file, state, progress, error: itemError }) => (
               <li key={id} className={`file-${state}`}>
                 <span className="file-name">{file.name}</span>
                 <span className="file-meta">{Math.ceil(file.size / 1024 / 1024)} MB · {itemError || stateLabel[state]}</span>
+                {(state === 'uploading' || state === 'transcribing') && (
+                  <span className={`progress${state === 'transcribing' ? ' indeterminate' : ''}`} role="progressbar" aria-label={`Avanzamento di ${file.name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={state === 'uploading' ? progress : undefined}>
+                    <i style={state === 'uploading' ? { width: `${progress}%` } : undefined} />
+                  </span>
+                )}
               </li>
             ))}
           </ul>
@@ -224,7 +231,7 @@ function Transcriber({ user, onLogout, onSessionExpired }) {
       </form>
 
       {error && <p className="message error">{error}</p>}
-      {status && <p className="message">{status}</p>}
+      {status && <p className="message" role="status" aria-live="polite">{isTranscribing && <span className="spinner" aria-hidden="true" />}{status}</p>}
 
       {doneItems.length > 0 && (
         <section className="result">
@@ -250,7 +257,7 @@ function Transcriber({ user, onLogout, onSessionExpired }) {
                       {availableFormats(item).map((format) => <option key={format.id} value={format.id}>{format.label}</option>)}
                     </select>
                     <button type="button" onClick={() => { const out = fileFor(item); saveText(out.content, out.filename, out.format.mime) }}>Scarica</button>
-                    <button type="button" onClick={() => copyText(`${id}-file`, fileFor(item).content)}>{copied === `${id}-file` ? 'Copiato ✓' : 'Copia'}</button>
+                    <button type="button" onClick={() => copyText(`${id}-file`, fileFor(item).content)}>{copied === `${id}-file` ? 'Copiato' : 'Copia'}</button>
                   </div>
                 </div>
                 {hasSpeakers(item) ? (
@@ -299,7 +306,7 @@ function Transcriber({ user, onLogout, onSessionExpired }) {
                       <>
                         <textarea className="generated" value={item.generated} onChange={(event) => updateItem(id, { generated: event.target.value })} aria-label={`Risultato elaborato di ${file.name}`} />
                         <div className="actions">
-                          <button type="button" onClick={() => copyText(`${id}-gen`, item.generated)}>{copied === `${id}-gen` ? 'Copiato ✓' : 'Copia'}</button>
+                          <button type="button" onClick={() => copyText(`${id}-gen`, item.generated)}>{copied === `${id}-gen` ? 'Copiato' : 'Copia'}</button>
                           <button type="button" onClick={() => saveText(item.generated, `${baseName(file.name)}-${item.presetId}.md`, 'text/markdown;charset=utf-8')}>Scarica .md</button>
                         </div>
                       </>
